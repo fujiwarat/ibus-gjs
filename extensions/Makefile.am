@@ -20,19 +20,10 @@
 # Free Software Foundation, Inc., 59 Temple Place, Suite 330,
 # Boston, MA  02111-1307  USA
 
-SUBDIRS = js extensions po
+extensionsdir = $(datadir)/gnome-shell/extensions
 
-EXTRA_DIST =		\
-	autogen.sh	\
+nobase_dist_extensions_DATA = 	\
+	ibus-indicator@example.com/extension.js \
+	ibus-indicator@example.com/metadata.json \
+	ibus-indicator@example.com/stylesheet.css \
 	$(NULL)
-
-# These are files checked into Git that we don't want to distribute
-DIST_EXCLUDE =					\
-	.gitignore				\
-	$(NULL)
-
-dist-hook:
-	if test -d .git ; then \
-	    git log --name-status --date=iso > $(distdir)/ChangeLog ; \
-	fi
-

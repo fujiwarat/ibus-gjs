@@ -145,6 +145,7 @@ Makefile
 ibus-gjs.spec
 js/Makefile
 js/misc/config.js
+extensions/Makefile
 ])
 
 AC_OUTPUT
