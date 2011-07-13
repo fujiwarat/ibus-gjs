@@ -1,0 +1,4 @@
+{"shell-version": ["3.0"],
+ "uuid": "ibus-indicator@example.com",
+ "name": "Input-Method Status Indicator",
+ "description": "Add a system status menu for input-methods using IBus"}
