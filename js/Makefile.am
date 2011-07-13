@@ -39,6 +39,7 @@ nobase_dist_js_DATA = 	\
 	$(NULL)
 
 EXTRA_DIST = \
+	misc/config.js.in		\
 	ui/status/ibus/panel.js.in	\
 	ui/status/ibus/xkbLayout.js.in	\
 	$(NULL)
@@ -47,8 +48,6 @@ ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
 	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
 	    sed -e "s|Config.IBUS_XKB|'$(IBUS_XKB)'|g" \
 	        -e "s|Config.HAVE_IBUS_XKB|$(HAVE_IBUS_XKB)|g" \
-	        -e "s|imports.misc.config.IBUS_PREFIX|'$(IBUS_PREFIX)'|g" \
-	        -e "s|imports.misc.config.IBUS_PKGDATADIR|'$(IBUS_PKGDATADIR)'|g" \
 	    $< > $@; \
 	else \
 	    cp $< $@; \
@@ -56,9 +55,7 @@ ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
 
 ui/status/ibus/panel.js: ui/status/ibus/panel.js.in
 	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
-	    sed -e "s|Config.IBUS_XKB|'$(IBUS_XKB)'|g" \
-	        -e "s|Config.HAVE_IBUS_XKB|$(HAVE_IBUS_XKB)|g" \
-	        -e "s|imports.misc.config.IBUS_PREFIX|'$(IBUS_PREFIX)'|g" \
+	    sed -e "s|imports.misc.config.IBUS_PREFIX|'$(IBUS_PREFIX)'|g" \
 	        -e "s|imports.misc.config.IBUS_PKGDATADIR|'$(IBUS_PKGDATADIR)'|g" \
 	    $< > $@; \
 	else \
