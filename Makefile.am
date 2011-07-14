@@ -24,6 +24,7 @@ SUBDIRS = js extensions po
 
 EXTRA_DIST =		\
 	autogen.sh	\
+	data/theme/gnome-shell.css \
 	$(NULL)
 
 # These are files checked into Git that we don't want to distribute

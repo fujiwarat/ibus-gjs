@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+const St = imports.gi.St;
 const Gtk = imports.gi.Gtk;
 const Gdk = imports.gi.Gdk;
 const Pango = imports.gi.Pango;
@@ -34,27 +35,115 @@ const ORIENTATION_VERTICAL   = imports.ui.status.ibus.common.ORIENTATION_VERTICA
 const ORIENTATION_SYSTEM     = imports.ui.status.ibus.common.ORIENTATION_SYSTEM;
 
 
-function eventbox_new() {
-    let retval = new Gtk.EventBox();
-    retval.connect('realize', function(widget) {
-        widget.window.set_cursor(Gdk.Cursor.new(Gdk.CursorType.HAND2));});
-    retval.show();
-    return retval;
+function StCandidateArea(orientation) {
+    this._init(orientation);
 }
 
-function hseparator_new() {
-    let retval = new Gtk.HBox({ homogeneous: false, spacing: 0 });
-    retval.pack_start(new Gtk.HSeparator(), true, true, 4);
-    retval.show();
-    return retval;
-}
+StCandidateArea.prototype = {
+    _init: function(orientation) {
+        this.actor = new St.BoxLayout({ vertical: false,
+                                        style_class: "candidate-area" });
+        this._orientation = orientation;
+        this._labels = [];
+        this._create_ui();
+    },
 
-function vseparator_new() {
-    let retval = new Gtk.VBox({ homogeneous: false, spacing: 0 });
-    retval.pack_start(new Gtk.VSeparator(), true, true, 4);
-    retval.show();
-    return retval;
-}
+    _create_ui: function() {
+        if (this._orientation == ORIENTATION_VERTICAL) {
+            this._vbox1 = new St.BoxLayout({vertical: true,
+                                            style_class: "candidate-vertical"});
+            this.actor.add(this._vbox1,
+                           { expand: true, 
+                             x_fill: true,
+                             y_fill: true
+                           });
+        }
+        for (let i = 0; i < 16; i++) {
+            let label1 = new St.Label({ text: "1234567890abcdef".charAt(i) + '.',
+                                        style_class: "candidate-label" });
+
+            let label2 = new St.Label({ text: '' ,
+                                        style_class: "candidate-text"});
+
+            if (this._orientation == ORIENTATION_VERTICAL) {
+                let hbox = new St.BoxLayout({vertical: false});
+                hbox.add(label1,
+                         { expand: false,
+                           x_fill: false,
+                           y_fill: true
+                         });
+                hbox.add(label2,
+                         { expand: true,
+                           x_fill: true,
+                           y_fill: true
+                         });
+                this._vbox1.add(hbox);
+            } else {
+                this.actor.add(label1);
+                this.actor.add(label2);
+            }
+
+            this._labels[this._labels.length] = [label1, label2];
+        }
+
+        // TODO: Can commit the strings with mouse?
+    },
+
+    set_labels: function(labels) {
+        if (!labels || labels.length == 0) {
+            for (let i = 0; i < 16; i++) {
+                this._labels[i][0].set_text("1234567890abcdef".charAt(i) + '.');
+            }
+            return;
+        }
+
+        for (let i = 0; j < labels.length && i < this._labels.length; i++) {
+            let [text, attrs] = labels[i];
+            this._labels[i][0].set_text(text);
+            this._labels[i][0].set_attributes(attrs);
+        }
+    },
+
+    set_candidates: function(candidates, focus_candidate, show_cursor) {
+        if (focus_candidate == undefined) {
+            focus_candidate = 0;
+        }
+        if (show_cursor == undefined) {
+            show_cursor = true;
+        }
+        if (candidates.length > this._labels.length) {
+            assert();
+        }
+
+        for (let i = 0; i < candidates.length; i++) {
+            let [text, attrs] = candidates[i];
+            if (i == focus_candidate && show_cursor) {
+                this._labels[i][1].add_style_pseudo_class('active');
+            } else {
+                this._labels[i][1].remove_style_pseudo_class('active');
+            }
+            this._labels[i][1].set_text(text);
+            for (let j = 0; j < this._labels[i].length; j++) {
+                this._labels[i][j].show();
+            }
+        }
+
+        for (let i = this._labels.length - 1; i >= candidates.length; i--) {
+            for (let j = 0; j < this._labels[i].length; j++) {
+                this._labels[i][j].hide();
+            }
+        }
+    },
+
+    show_all: function() {
+        this.actor.show();
+    },
+
+    hide_all: function() {
+        this.actor.hide();
+    },
+
+};
 
 function CandidateArea(orientation) {
     this._init(orientation);
@@ -62,68 +151,9 @@ function CandidateArea(orientation) {
 
 CandidateArea.prototype = {
     _init: function(orientation) {
-        this._hbox = new Gtk.HBox({ homogeneous: false, spacing: 0 });
-        this._hbox.set_name('IBusCandidateArea');
         this._orientation = orientation;
         this._labels = [];
         this._candidates = [];
-        this._create_ui();
-    },
-
-    _create_ui: function() {
-        if (this._orientation == ORIENTATION_VERTICAL) {
-            this._vbox1 = new Gtk.VBox({ homogeneous: false, spacing: 0 });
-            this._vbox2 = new Gtk.VBox({ homogeneous: false, spacing: 0 });
-            this._hbox.pack_start(this._vbox1, false, false, 4);
-            this._hbox.pack_start(vseparator_new(), false, false, 0);
-            this._hbox.pack_start(this._vbox2, true, true, 4);
-        }
-
-        for (let i = 0; i < 16; i++) {
-            let label1 = new Gtk.Label({ label: "1234567890abcdef".charAt(i) + '.' });
-            label1.set_alignment(0.0, 0.5);
-            label1.show();
-
-            let label2 = new Gtk.Label({ label: '' });
-            label2.set_alignment(0.0, 0.5);
-            label2.show();
-
-            if (this._orientation == ORIENTATION_VERTICAL) {
-                label1.set_property('xpad', 8);
-                label2.set_property('xpad', 8);
-                let ebox1 = eventbox_new();
-                ebox1.set_no_show_all(true);
-                ebox1.add(label1);
-                let ebox2 = eventbox_new();
-                ebox2.set_no_show_all(true);
-                ebox2.add(label2);
-                this._vbox1.pack_start(ebox1, false, false, 2);
-                this._vbox2.pack_start(ebox2, false, false, 2);
-                this._candidates[this._candidates.length] = [ebox1, ebox2];
-            } else {
-                let hbox = new Gtk.HBox({ homogeneous: false, spacing: 0 });
-                hbox.show();
-                hbox.pack_start(label1, false, false, 1);
-                hbox.pack_start(label2, false, false, 1);
-                let ebox = eventbox_new();
-                ebox.set_no_show_all(true);
-                ebox.add(hbox);
-                this._hbox.pack_start(ebox, false, false, 4);
-                this._candidates[this._candidates.length] = [ebox,];
-            }
-
-            this._labels[this._labels.length] = [label1, label2];
-        }
-
-        for (let i = 0; i < this._candidates.length; i++) {
-            let ws = this._candidates[i];
-            for(let j = 0; j < ws.length; j++) {
-                let w = ws[j];
-                w.data = i;
-                w.connect('button-press-event', Lang.bind(this, function(w, e) {
-                    this.emit('candidate-clicked', w.data, e.button, e.state);}));
-            }
-        }
     },
 
     set_labels: function(labels) {
@@ -227,28 +257,12 @@ function CandidatePanel() {
 
 CandidatePanel.prototype = {
     _init: function() {
-        this._vbox = new Gtk.VBox({ homogeneous: false, spacing: 0 });
-        this._toplevel = new Gtk.Window({ type: Gtk.WindowType.POPUP });
-        this._viewport = new Gtk.Viewport();
-        this._viewport.set_shadow_type(Gtk.ShadowType.IN);
-        this._toplevel.add(this._viewport);
-
-        let hbox = new Gtk.HBox({ homogeneous: false, spacing: 0 });
         let handle = new Handle.Handle();
         handle.connect('move-end',
                        Lang.bind(this, this._handle_move_end_cb));
         handle.show();
-        hbox.pack_start(handle.get_raw(), true, true, 0);
-        hbox.pack_start(this._vbox, true, true, 0);
 
-        this._viewport.add(hbox);
-        this._toplevel.add_events(
-            Gdk.EventMask.BUTTON_PRESS_MASK |
-            Gdk.EventMask.BUTTON_RELEASE_MASK |
-            Gdk.EventMask.BUTTON1_MOTION_MASK);
         this._begin_move = false;
-        this._toplevel.connect('size-allocate', Lang.bind(this, function (w, a) {
-            this._check_position();}));
 
         this._orientation = ORIENTATION_VERTICAL;
         this._current_orientation = this._orientation;
@@ -264,135 +278,67 @@ CandidatePanel.prototype = {
         this._cursor_location = [0, 0, 0, 0];
         this._moved_cursor_location = null; 
 
-        this._recreate_ui();
+        this._init_st();
 
-        // size-request is a deprecated signal.
-        //this._vbox.connect('size-request', Lang.bind(this, this._size_request));
+    },
+
+    _init_st: function() {
+        this._st_candidate_panel = new St.BoxLayout({style_class: 'candidate-panel',
+                                          vertical: true});
+
+        this._st_preedit_label = new St.Label({text: this._preedit_string});
+        if (!this._preedit_visible) {
+            this._st_preedit_label.hide();
+        }
+        this._st_aux_label = new St.Label({text: this._aux_string});
+        if (!this._aux_visible) {
+            this._st_aux_label.hide();
+        }
+        this._st_candidate_panel.set_position(500, 500);
+        // create candidates area
+        this._st_candidate_area = new StCandidateArea(this._current_orientation);
+        // TODO: Can commit the strings with mouse?
+
+        this._pack_all_st_widgets();
+        global.stage.add_actor(this._st_candidate_panel);
+        this._check_show_states();
+    },
+
+    _pack_all_st_widgets: function() {
+        this._st_candidate_panel.add(this._st_preedit_label,
+                                     {x_fill: true,
+                                      y_fill: false,
+                                      x_align: St.Align.MIDDLE,
+                                      y_align: St.Align.START});
+        this._st_candidate_panel.add(this._st_aux_label,
+                                     {x_fill: true,
+                                      y_fill: false,
+                                      x_align: St.Align.MIDDLE,
+                                      y_align: St.Align.MIDDLE});
+        this._st_candidate_panel.add(this._st_candidate_area.actor,
+                                     {x_fill: true,
+                                      y_fill: false,
+                                      x_align: St.Align.MIDDLE,
+                                      y_align: St.Align.END});
     },
 
     _handle_move_end_cb: function(handle) {
         // store moved location
-        let [x, y] = this._toplevel.get_position();
+        let [x, y] = this._st_candidate_area.get_position();
         this._moved_cursor_location = [x, y,
                                        this._cursor_location[2],
                                        this._cursor_location[3]];
     },
 
-    _recreate_ui: function() {
-        let list = this._vbox.get_children();
-        for (let i = 0; i < list.length; i++) {
-            let w = list[i];
-            this._vbox.remove(w);
-            w.destroy();
-        }
-        // create preedit label
-        this._preedit_label = new Gtk.Label({ label: this._preedit_string });
-        this._preedit_label.set_attributes(this._preedit_attrs);
-        this._preedit_label.set_alignment(0.0, 0.5);
-        this._preedit_label.set_padding(8, 0);
-        this._preedit_label.set_no_show_all(true);
-        if (this._preedit_visible) {
-            this._preedit_label.show();
-        }
-
-        // create aux label
-        this._aux_label = new Gtk.Label({ label: this._aux_string });
-        this._aux_label.set_attributes(this._aux_attrs);
-        this._aux_label.set_alignment(0.0, 0.5);
-        this._aux_label.set_padding(8, 0);
-        this._aux_label.set_no_show_all(true);
-        if (this._aux_string_visible) {
-            this._aux_label.show();
-        }
-
-        // create candidates area
-        this._candidate_area = new CandidateArea(this._current_orientation);
-        this._candidate_area.get_raw().set_no_show_all(true);
-        this._candidate_area.connect('candidate-clicked', Lang.bind(this, function(x, i, b, s) {
-            this.emit('candidate-clicked', i, b, s);}));
-        // this.update_lookup_table(this._lookup_table, this._lookup_table_visible);
-
-        // create state label
-        this._state_label = new Gtk.Label({ label: '' });
-        this._state_label.set_size_request(20, -1);
-
-        // create buttons
-        this._prev_button = new Gtk.Button();
-        this._prev_button.connect('clicked', Lang.bind(this, function(x) {
-            this.emit('page-up');}));
-        this._prev_button.set_relief(Gtk.ReliefStyle.NONE);
-        this._prev_button.set_tooltip_text(_("Previous page"));
-
-        this._next_button = new Gtk.Button();
-        this._next_button.connect('clicked', Lang.bind(this, function(x) {
-            this.emit('page-down');}));
-        this._next_button.set_relief(Gtk.ReliefStyle.NONE);
-        this._next_button.set_tooltip_text(_("Next page"));
-
-        this._pack_all_widgets();
-        this._check_show_states();
-    },
-
-    _pack_all_widgets: function() {
-        if (this._current_orientation == ORIENTATION_VERTICAL) {
-            // package all widgets in vertical mode
-            let image = new Gtk.Image();
-            image.set_from_stock(Gtk.STOCK_GO_UP, Gtk.IconSize.MENU);
-            this._prev_button.set_image(image);
-
-            image = new Gtk.Image();
-            image.set_from_stock(Gtk.STOCK_GO_DOWN, Gtk.IconSize.MENU);
-            this._next_button.set_image(image);
-
-            let vbox = new Gtk.VBox({ homogeneous: false, spacing: 0 });
-            vbox.pack_start(this._preedit_label, false, false, 0);
-            vbox.pack_start(this._aux_label, false, false, 0);
-            this._vbox.pack_start(vbox, false, false, 5);
-            this._vbox.pack_start(hseparator_new(), false, false, 0);
-            this._vbox.pack_start(this._candidate_area.get_raw(), false, false, 2);
-            this._vbox.pack_start(hseparator_new(), false, false, 0);
-            let hbox= new Gtk.HBox({ homogeneous: false, spacing: 0 });
-            hbox.pack_start(this._state_label, true, true, 0);
-            hbox.pack_start(vseparator_new(), false, false, 0);
-            hbox.pack_start(this._prev_button, false, false, 2);
-            hbox.pack_start(this._next_button, false, false, 2);
-            this._vbox.pack_start(hbox, false, false, 0);
-        } else {
-            // package all widgets in HORIZONTAL mode
-            let image = new Gtk.Image();
-            image.set_from_stock(Gtk.STOCK_GO_UP, Gtk.IconSize.MENU);
-            this._prev_button.set_image(image);
-
-            image = new Gtk.Image();
-            image.set_from_stock(Gtk.STOCK_GO_DOWN, Gtk.IconSize.MENU);
-            this._next_button.set_image(image);
-
-            let vbox = new Gtk.VBox({ homogeneous: false, spacing: 0 });
-            vbox.pack_start(this._preedit_label, false, false, 0);
-            vbox.pack_start(this._aux_label, false, false, 0);
-            this._vbox.pack_start(vbox, false, false, 5);
-            this._vbox.pack_start(hseparator_new(), false, false, 0);
-            let hbox = new Gtk.HBox({ homogeneous: false, spacing: 0 });
-            hbox.pack_start(this._candidate_area.get_raw(), true, true, 2);
-            hbox.pack_start(vseparator_new(), false, false, 0);
-            hbox.pack_start(this._prev_button, false, false, 2);
-            hbox.pack_start(this._next_button, false, false, 2);
-            this._vbox.pack_start(hbox, false, false, 0);
-        }
-
-         // this._vbox.hide();
-         // this._vbox.show_all();
-    },
-
     show_preedit_text: function() {
         this._preedit_visible = true;
-        this._preedit_label.show();
+        this._st_preedit_label.show();
         this._check_show_states();
     },
 
     hide_preedit_text: function() {
         this._preedit_visible = false;
-        this._preedit_label.hide();
+        this._st_preedit_label.hide();
         this._check_show_states();
     },
 
@@ -404,20 +350,19 @@ CandidatePanel.prototype = {
             this.hide_preedit_text();
         }
         this._preedit_stribg = text.get_text();
-        this._preedit_label.set_text(text.get_text());
+        this._st_preedit_label.set_text(text.get_text());
         this._preedit_attrs = attrs;
-        this._preedit_label.set_attributes(attrs.get_raw());
     },
 
     show_auxiliary_text: function() {
         this._aux_string_visible = true;
-        this._aux_label.show();
+        this._st_aux_label.show();
         this._check_show_states();
     },
 
     hide_auxiliary_text: function() {
         this._aux_string_visible = false;
-        this._aux_label.hide();
+        this._st_aux_label.hide();
         this._check_show_states();
     },
 
@@ -431,9 +376,8 @@ CandidatePanel.prototype = {
         }
 
         this._aux_string = text.get_text();
-        this._aux_label.set_text(text.get_text());
+        this._st_aux_label.set_text(text.get_text());
         this._aux_attrs = attrs;
-        this._aux_label.set_attributes(attrs.get_raw());
     },
 
     _refresh_labels: function() {
@@ -443,7 +387,7 @@ CandidatePanel.prototype = {
             new_labels[new_labels.length] = [label.get_text(),
                                              new PangoAttrList(label.get_attributes(), label.get_text()).get_raw()];
         }
-        this._candidate_area.set_labels(new_labels);
+        this._st_candidate_area.set_labels(new_labels);
     },
 
 
@@ -476,10 +420,10 @@ CandidatePanel.prototype = {
             new_candidates[new_candidates.length] = [candidate.get_text(),
                                                      new PangoAttrList(candidate.get_attributes(), candidate.get_text()).get_raw()];
         }
-        this._candidate_area.set_candidates(new_candidates,
-                this._get_cursor_pos_in_current_page(),
-                this._lookup_table.is_cursor_visible()
-                );
+        this._st_candidate_area.set_candidates(new_candidates,
+                                               this._get_cursor_pos_in_current_page(),
+                                               this._lookup_table.is_cursor_visible()
+                                              );
     },
 
     update_lookup_table: function(lookup_table, visible) {
@@ -490,6 +434,7 @@ CandidatePanel.prototype = {
 
         this._lookup_table = lookup_table || ibus.LookupTable();
         let orientation = this._lookup_table.get_orientation();
+        global.log('current orientation is:' + orientation);
         if (orientation != ORIENTATION_HORIZONTAL &&
             orientation != ORIENTATION_VERTICAL) {
             orientation = this._orientation;
@@ -497,7 +442,6 @@ CandidatePanel.prototype = {
         this.set_current_orientation(orientation);
         this._refresh_candidates();
         this._refresh_labels();
-        this._size_request();
 
         // show lookup table
         if (visible) {
@@ -507,15 +451,13 @@ CandidatePanel.prototype = {
 
     show_lookup_table: function() {
         this._lookup_table_visible = true;
-        this._candidate_area.get_raw().set_no_show_all(false);
-        this._candidate_area.get_raw().show_all();
+        this._st_candidate_area.show_all();
         this._check_show_states();
     },
 
     hide_lookup_table: function() {
         this._lookup_table_visible = false;
-        this._candidate_area.hide_all();
-        this._candidate_area.set_no_show_all(true);
+        this._st_candidate_area.hide_all();
         this._check_show_states();
     },
 
@@ -552,13 +494,11 @@ CandidatePanel.prototype = {
         if (this._preedit_visible ||
             this._aux_string_visible ||
             this._lookup_table_visible) {
-            this._vbox.show_all();
-            this._toplevel.show_all();
+            this._st_candidate_panel.show();
             this._check_position();
             this.emit('show');
         } else {
-            this._vbox.hide();
-            this._toplevel.hide();
+            this._st_candidate_panel.hide();
             this.emit('hide');
         }
     },
@@ -579,10 +519,7 @@ CandidatePanel.prototype = {
             return;
         }
         this._current_orientation = orientation;
-        this._recreate_ui();
-        if (this._toplevel.get_visible()) {
-            this._vbox.show_all();
-        }
+        // FIXME:
     },
 
     set_orientation: function(orientation) {
@@ -594,37 +531,20 @@ CandidatePanel.prototype = {
         return this._current_orientation;
     },
 
-    // do_expose_event: function(event) {
-    //     this.style.paint_box(this.window,
-    //                 Gtk.StateType.NORMAL,
-    //                 Gtk.ShadowType.IN,
-    //                 event.area,
-    //                 this._vbox,
-    //                 'panel',
-    //                 this.allocation.x, this.allocation.y,
-    //                 this.allocation.width, this.allocation.height);
-
-    //     Gtk.VBox.do_expose_event(this._vbox, event);
-    // },
-
-    _size_request: function() {
-        this._toplevel.resize(1, 1);
-    },
-
     _check_position: function() {
         let cursor_location = this._moved_cursor_location || this._cursor_location;
         let cursor_right = cursor_location[0] + cursor_location[2];
         let cursor_bottom = cursor_location[1] + cursor_location[3];
 
-        let window_right = cursor_right + this._toplevel.get_allocated_width();
-        let window_bottom = cursor_bottom + this._toplevel.get_allocated_height();
+        let window_right = cursor_right + this._st_candidate_panel.get_width();
+        let window_bottom = cursor_bottom + this._st_candidate_panel.get_height();
         let root_window = Gdk.get_default_root_window();
         let [sx, sy] = [root_window.get_width(), root_window.get_height()];
         let x = 0;
         let y = 0;
 
         if (window_right > sx) {
-            x = sx - this._toplevel.get_allocated_width();
+            x = sx - this._st_candidate_panel.get_width();
         } else {
             x = cursor_right;
         }
@@ -636,7 +556,8 @@ CandidatePanel.prototype = {
             if (this._current_orientation == ORIENTATION_VERTICAL) {
                 pad = 10;
             }
-            y = cursor_location[1] - this._toplevel.get_allocated_height() - pad;
+            y = Math.min(cursor_location[1] - pad, sy) - 
+                this._st_candidate_panel.get_height();
         } else {
             y = cursor_bottom;
         }
@@ -645,31 +566,16 @@ CandidatePanel.prototype = {
     },
 
     show_all: function() {
-        this._vbox.show_all();
-        this._toplevel.show_all();
+        this._st_candidate_panel.show();
     },
 
     hide_all: function() {
-        this._vbox.hide();
-        this._toplevel.hide();
+        this._st_candidate_panel.hide();
     },
 
     move: function(x, y) {
-        this._toplevel.move(x, y);
+        this._st_candidate_panel.set_position(x, y);
     },
 };
 
 Signals.addSignalMethods(CandidatePanel.prototype);
-
-/*
-if (0) {
-    Gtk.init(0, null);
-    let table = IBus.LookupTable.new(5, 0, true, false);
-    table.append_candidate(IBus.Text.new_from_string('AAA'));
-    table.append_candidate(IBus.Text.new_from_string('BBB'));
-    let cp = new CandidatePanel();
-    cp.show_all();
-    cp.update_lookup_table(table, true);
-    Gtk.main();
-}
-*/
