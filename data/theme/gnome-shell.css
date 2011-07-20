@@ -1857,13 +1857,26 @@ StTooltip StLabel {
 }
 
 .candidate-label {
-    padding-right: 10px;
+    cursor: pointer;
 }
 
-.candidate-vertical > .candidate-label {
+.candidate-vertical .candidate-label {
+    padding-right: 10px;
     border-right: 1px #868686 solid;
+}
+
+.candidate-horizontal .candidate-label {
+    padding-left: 5px;
 }
 
 .candidate-text:active {
     background-color: #555555;
+}
+
+.candidate-text:hover {
+    background-color: #777777;
+}
+
+.candidate-horizontal .candidate-text {
+    padding-right: 5px;
 }

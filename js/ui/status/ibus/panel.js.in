@@ -38,10 +38,12 @@ const PopupImageMenuItemMarkup = imports.ui.status.ibus.popupMenu.PopupImageMenu
 const XKBLayout = imports.ui.status.ibus.xkbLayout;
 const Common = imports.ui.status.ibus.common;
 const _ = imports.ui.status.ibus.common._;
+const ORIENTATION_HORIZONTAL = imports.ui.status.ibus.common.ORIENTATION_HORIZONTAL;
+const ORIENTATION_VERTICAL   = imports.ui.status.ibus.common.ORIENTATION_VERTICAL;
 
 const ICON_KEYBOARD = 'input-keyboard-symbolic';
 const ICON_ENGINE = 'ibus-engine';
-const LIGHTBOX_FADE_TIME = 0.1
+const LIGHTBOX_FADE_TIME = 0.1;
 
 
 function Panel(bus, indicator) {
@@ -64,7 +66,6 @@ Panel.prototype = {
         if (!this._init_bus(bus)) {
             return;
         }
-        // this._bus.config_add_watch('panel')
 
         this._language_bar = new LanguageBar.LanguageBar(indicator);
         this._language_bar.connect('property-activate',
@@ -83,20 +84,25 @@ Panel.prototype = {
                                       Lang.bind(this, function(widget) {
                                           this.page_down();}));
         this._candidate_panel.connect('candidate-clicked',
-                                      Lang.bind(this, function(widget, index, button, state) {
-                                          this.candidate_clicked(index, button, state);}));
+                                      Lang.bind(this,
+                                                function(widget, index, button, state) {
+                                                    this.candidate_clicked(index, button, state);}));
 
         this._indicator.setIcon(ICON_KEYBOARD);
         this._indicator.actor.connect('button-press-event',
                                       Lang.bind(this, this._on_shell_panel_button_press_event));
+
+        // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
+        // config value now.
+        //this._config_load_lookup_table_orientation();
     },
 
     _init_bus: function(bus) {
         this._bus = bus;
-        this._config = this._bus.get_config();
         this._focus_ic = null;
 
         // connect bus signal
+        this._config = this._bus.get_config();
         if (this._config == null) {
             log('Could not get ibus-gconf.');
             return false;
@@ -104,8 +110,10 @@ Panel.prototype = {
 
         PanelBase.PanelBase.prototype._init.call(this, bus);
 
-        this._config.connect('value-changed', this._config_value_changed_cb)
-        //this._config.connect('reloaded', this._config_reloaded_cb)
+        this._config.connect('value-changed',
+                             Lang.bind(this, this._config_value_changed_cb));
+        // this._config.connect('reloaded', this._config_reloaded_cb);
+
         this._bus.get_connection().signal_subscribe('org.freedesktop.DBus',
                                                     'org.freedesktop.DBus',
                                                     'NameOwnerChanged',
@@ -182,12 +190,26 @@ Panel.prototype = {
     },
 
     _config_value_changed_cb: function(bus, section, name, value) {
+        global.log ('config changed:' + section + '-' + name + ':' + value);
         if (section != 'panel') {
             return;
         }
+        // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
+        // config value now.
+        /*
         if (name == 'lookup_table_orientation') {
-            return;
+            this._config_load_lookup_table_orientation();
         }
+        */
+    },
+
+    _config_load_lookup_table_orientation: function() {
+        let value = this._config.get_value("panel", "lookup_table_orientation", 0);
+        let orientation = ORIENTATION_VERTICAL;
+        if (value in [ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL])
+            orientation = value;
+        if (this._candidate_panel)
+            this._candidate_panel.set_orientation(orientation);
     },
 
     _config_reloaded_cb: function(bus) {

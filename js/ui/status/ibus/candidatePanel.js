@@ -3,6 +3,7 @@
  * Copyright 2011 Red Hat, Inc.
  * Copyright 2011 Peng Huang <shawn.p.huang@gmail.com>
  * Copyright 2011 Takao Fujiwara <tfujiwar@redhat.com>
+ * Copyright 2011 Tiger Soldier <tigersoldi@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -25,6 +26,8 @@ const Pango = imports.gi.Pango;
 const IBus = imports.gi.IBus;
 const Lang = imports.lang;
 const Signals = imports.signals;
+const Main = imports.ui.main;
+const Shell = imports.gi.Shell;
 
 const Handle = imports.ui.status.ibus.handle;
 const PangoAttrList = imports.ui.status.ibus.pangoAttrList.PangoAttrList;
@@ -41,18 +44,32 @@ function StCandidateArea(orientation) {
 
 StCandidateArea.prototype = {
     _init: function(orientation) {
-        this.actor = new St.BoxLayout({ vertical: false,
-                                        style_class: "candidate-area" });
+        this.actor = new St.BoxLayout({ style_class: "candidate-area" });
         this._orientation = orientation;
         this._labels = [];
         this._create_ui();
     },
 
+    _remove_old_widgets: function() {
+        this.actor.destroy_children();
+        this._labels = [];
+    },
+
     _create_ui: function() {
+        let vbox = null;
+        let hbox = null;
         if (this._orientation == ORIENTATION_VERTICAL) {
-            this._vbox1 = new St.BoxLayout({vertical: true,
-                                            style_class: "candidate-vertical"});
-            this.actor.add(this._vbox1,
+            vbox = new St.BoxLayout({vertical: true,
+                                         style_class: "candidate-vertical"});
+            this.actor.add(vbox,
+                           { expand: true, 
+                             x_fill: true,
+                             y_fill: true
+                           });
+        } else {
+            hbox = new St.BoxLayout({vertical: false,
+                                         style_class: "candidate-horizontal"});
+            this.actor.add(hbox,
                            { expand: true, 
                              x_fill: true,
                              y_fill: true
@@ -60,33 +77,64 @@ StCandidateArea.prototype = {
         }
         for (let i = 0; i < 16; i++) {
             let label1 = new St.Label({ text: "1234567890abcdef".charAt(i) + '.',
-                                        style_class: "candidate-label" });
+                                        style_class: "candidate-label",
+                                        reactive: true });
 
             let label2 = new St.Label({ text: '' ,
-                                        style_class: "candidate-text"});
+                                        style_class: "candidate-text",
+                                        reactive: true });
 
             if (this._orientation == ORIENTATION_VERTICAL) {
-                let hbox = new St.BoxLayout({vertical: false});
-                hbox.add(label1,
-                         { expand: false,
-                           x_fill: false,
-                           y_fill: true
-                         });
-                hbox.add(label2,
-                         { expand: true,
-                           x_fill: true,
-                           y_fill: true
-                         });
-                this._vbox1.add(hbox);
+                let candidate_hbox = new St.BoxLayout({vertical: false});
+                candidate_hbox.add(label1,
+                                   { expand: false,
+                                     x_fill: false,
+                                     y_fill: true
+                                   });
+                candidate_hbox.add(label2,
+                                   { expand: true,
+                                     x_fill: true,
+                                     y_fill: true
+                                   });
+                vbox.add(candidate_hbox);
             } else {
-                this.actor.add(label1);
-                this.actor.add(label2);
+                hbox.add(label1);
+                hbox.add(label2);
             }
 
             this._labels[this._labels.length] = [label1, label2];
         }
 
-        // TODO: Can commit the strings with mouse?
+        for (let i = 0; i < this._labels.length; i++) {
+            for(let j = 0; j < this._labels[i].length; j++) {
+                let widget = this._labels[i][j];
+                widget.candidate_index = i;
+                widget.connect('button-press-event', 
+                               Lang.bind(this, function (widget, event) {
+                                   this._candidate_clicked_cb(widget, event);
+                               }));
+                widget.connect('enter-event',
+                               function(widget, event) {
+                                   widget.add_style_pseudo_class('hover');
+                               });
+                widget.connect('leave-event',
+                               function(widget, event) {
+                                   widget.remove_style_pseudo_class('hover');
+                               });
+            }
+        }
+    },
+
+    _recreate_ui: function() {
+        this._remove_old_widgets();
+        this._create_ui();
+    },
+
+    _candidate_clicked_cb: function(widget, event) {
+        this.emit('candidate-clicked',
+                  widget.candidate_index,
+                  event.get_button(),
+                  Shell.get_event_state(event));
     },
 
     set_labels: function(labels) {
@@ -135,6 +183,13 @@ StCandidateArea.prototype = {
         }
     },
 
+    set_orientation: function(orientation) {
+        if (orientation == this._orientation)
+            return;
+        this._orientation = orientation;
+        this._recreate_ui();
+    },
+
     show_all: function() {
         this.actor.show();
     },
@@ -142,114 +197,9 @@ StCandidateArea.prototype = {
     hide_all: function() {
         this.actor.hide();
     },
-
 };
 
-function CandidateArea(orientation) {
-    this._init(orientation);
-}
-
-CandidateArea.prototype = {
-    _init: function(orientation) {
-        this._orientation = orientation;
-        this._labels = [];
-        this._candidates = [];
-    },
-
-    set_labels: function(labels) {
-        if (!labels || labels.length == 0) {
-            for (let i = 0; i < 16; i++) {
-                this._labels[i][0].set_text("1234567890abcdef".charAt(i) + '.');
-                this._labels[i][0].set_attributes(new Pango.AttrList());
-            }
-            return;
-        }
-
-        let i = 0;
-        for (let j = 0; j < labels.length; j++) {
-            let [text, attrs] = labels[j];
-            this._labels[i][0].set_text(text);
-            this._labels[i][0].set_attributes(attrs);
-            i += 1;
-            if (i >= 16) {
-                break;
-            }
-        }
-    },
-
-    set_candidates: function(candidates, focus_candidate, show_cursor) {
-        if (focus_candidate == undefined) {
-            focus_candidate = 0;
-        }
-        if (show_cursor == undefined) {
-            show_cursor = true;
-        }
-        if (candidates.length > this._labels.length) {
-            assert();
-        }
-
-        for (let i = 0; i < candidates.length; i++) {
-            let [text, attrs] = candidates[i];
-            if (i == focus_candidate && show_cursor) {
-                if (attrs == null) {
-                    attrs = new Pango.AttrList();
-                }
-                /* FIXME: Need to get GtkStyle->base */
-                //let color = this._labels[i][1].style.base[Gtk.StateType.SELECTED];
-                let color = {pixels: 0, red: 0x4b4b, green: 0x6969, blue: 0x8383};
-                let end_index = text.length;
-                /* Currently no definition to convert Pango.Attribute to
-                 * Javascript object. No pango_attribute_get_type() */
-                //let attr = Pango.attr_background_new(color.red, color.green, color.blue, 0, end_index);
-                //attrs.change(attr);
-                //color = this._labels[i][1].style.text[Gtk.StateType.SELECTED];
-                color = {pixels: 0, red: 65535, green: 65535, blue: 65535};
-                /* Currently no definition to convert Pango.Attribute to
-                 * Javascript object. No pango_attribute_get_type() */
-                //attr = Pango.attr_background_new(color.red, color.green, color.blue, 0, end_index);
-                //attrs.insert(attr);
-            }
-
-            /* Workaround for Pango.Attribute */
-            if (i == focus_candidate && show_cursor) {
-                let markup_text = '<span background=\"SlateBlue\" foreground=\"white\">' + text + '</span>';
-                this._labels[i][1].set_markup(markup_text);
-            } else {
-                this._labels[i][1].set_text(text);
-            }
-            this._labels[i][1].show();
-            this._labels[i][1].set_attributes(attrs);
-            for (let j = 0; j < this._candidates[i].length; j++) {
-                this._candidates[i][j].show();
-            }
-        }
-
-        /* FIXME: It seems other candidate labels are also hide... */
-        for (let i = this._candidates.length - 1; i >= candidates.length; i--) {
-            for (let j = 0; j < this._candidates[i].length; j++) {
-                this._candidates[i][j].hide();
-            }
-        }
-    },
-
-    show_all: function() {
-        this._hbox.show_all();
-    },
-
-    hide_all: function() {
-        this._hbox.hide();
-    },
-
-    set_no_show_all: function(show) {
-        this._hbox.set_no_show_all(show);
-    },
-
-    get_raw: function() {
-        return this._hbox;
-    },
-};
-
-Signals.addSignalMethods(CandidateArea.prototype);
+Signals.addSignalMethods(StCandidateArea.prototype);
 
 function CandidatePanel() {
     this._init();
@@ -297,10 +247,17 @@ CandidatePanel.prototype = {
         this._st_candidate_panel.set_position(500, 500);
         // create candidates area
         this._st_candidate_area = new StCandidateArea(this._current_orientation);
-        // TODO: Can commit the strings with mouse?
+        this._st_candidate_area.connect('candidate-clicked', 
+                                        Lang.bind(this, function(x, i, b, s) {
+                                                      this.emit('candidate-clicked', i, b, s);}));
+        this.update_lookup_table(this._lookup_table, this._lookup_table_visible);
+
+        // TODO: page up/down GUI
 
         this._pack_all_st_widgets();
-        global.stage.add_actor(this._st_candidate_panel);
+        Main.chrome.addActor(this._st_candidate_panel,
+                             { visibleInOverview: true,
+                               affectsStruts: false });
         this._check_show_states();
     },
 
@@ -432,9 +389,8 @@ CandidatePanel.prototype = {
             this.hide_lookup_table();
         }
 
-        this._lookup_table = lookup_table || ibus.LookupTable();
+        this._lookup_table = lookup_table || new IBus.LookupTable();
         let orientation = this._lookup_table.get_orientation();
-        global.log('current orientation is:' + orientation);
         if (orientation != ORIENTATION_HORIZONTAL &&
             orientation != ORIENTATION_VERTICAL) {
             orientation = this._orientation;
@@ -519,7 +475,7 @@ CandidatePanel.prototype = {
             return;
         }
         this._current_orientation = orientation;
-        // FIXME:
+        this._st_candidate_area.set_orientation(orientation);
     },
 
     set_orientation: function(orientation) {
