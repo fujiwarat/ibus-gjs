@@ -41,7 +41,8 @@ const _ = imports.ui.status.ibus.common._;
 const ORIENTATION_HORIZONTAL = imports.ui.status.ibus.common.ORIENTATION_HORIZONTAL;
 const ORIENTATION_VERTICAL   = imports.ui.status.ibus.common.ORIENTATION_VERTICAL;
 
-const ICON_KEYBOARD = 'input-keyboard-symbolic';
+const ICON_KEYBOARD = XKBLayout.ICON_KEYBOARD;
+const DEFAULT_BRIDGE_ENGINE_NAME = XKBLayout.DEFAULT_BRIDGE_ENGINE_NAME;
 const ICON_ENGINE = 'ibus-engine';
 const LIGHTBOX_FADE_TIME = 0.1;
 
@@ -128,21 +129,24 @@ Panel.prototype = {
         this._default_layout = 'default';
         this._default_model = 'default';
         this._default_option = 'default';
-        this._use_bridge_hotkey = false;
+        this._use_bridge_hotkey_system = false;
         try {
-            this._use_bridge_hotkey = this._bus.use_bridge_hotkey();
+            this._use_bridge_hotkey_system = IBus.use_bridge_hotkey();
         } catch (e) {
             // This feature is not available.
         }
-        this._default_bridge_engine_name = null;
-        if (this._use_bridge_hotkey) {
-            this._default_bridge_engine_name = this._bus.get_default_bridge_engine_name();
+        this._default_bridge_engine_name = DEFAULT_BRIDGE_ENGINE_NAME;
+        try {
+            this._default_bridge_engine_name = IBus.get_default_bridge_engine_name();
+        } catch (e) {
+            // This feature is not available.
         }
         this._disabled_engines = null;
         this._disabled_engines_id = -1;
         this._disabled_engines_prev_id = -1;
         this._disabled_engines_swapped = 0;
         this._xkb_group_id = -1;
+        this._disabled_engines_component = null;
 
         this._xkblayout = new XKBLayout.XKBLayout(this._config);
         /* Currently GLib.Variant is not implemented. bug #622344 */
@@ -186,6 +190,22 @@ Panel.prototype = {
             this._xkblayout.set_default_option(value);
         }
 
+        return true;
+    },
+
+    _use_bridge_hotkey: function() {
+        if (!this._use_bridge_hotkey_system) {
+            return false;
+        }
+        if (this._config == null) {
+            return true;
+        }
+        // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
+        // config value now.
+        /*
+        return this._config.get_value("general/hotkey", "use_bridge_hotkey",
+                                      true);
+        */
         return true;
     },
 
@@ -271,39 +291,26 @@ Panel.prototype = {
         }
 
         for (let i = 0; i < engines.length; i++) {
-            if (this._use_bridge_hotkey &&
-                engines[i].name == this._default_bridge_engine_name &&
+            if (this._use_bridge_hotkey() &&
+                engines[i].name != null &&
+                engines[i].name.substring(0, this._default_bridge_engine_name.length)
+                    == this._default_bridge_engine_name  &&
                 this._disabled_engines != null) {
-                let array = [];
-                for (let j = 0; this._disabled_engines[j] != null; j++) {
+                engines[i].is_bridge = true;
+                for (let j = 0; j < this._disabled_engines.length ; j++) {
                     let kb_engine = this._disabled_engines[j];
-                    kb_engine.is_bridge = true;
-                    kb_engine.disabled_engines_id = j;
-                    kb_engine.is_bold = (current_engine != null &&
-                                         current_engine.name == engines[i].name &&
-                                         j == this._disabled_engines_id) ?
-                                        true : false;
-                    array = engines.slice(0, i + j + 1).concat([kb_engine]);
-                    array = array.concat(engines.slice(i + j + 1));
-                    engines = array;
+                    if (engines[i].name == kb_engine.name) {
+                        engines[i].disabled_engines_id = j;
+                        break;
+                    }
                 }
-                if (i == 0) {
-                    array = [];
-                } else {
-                    array = engines.slice(0, i)
-                }
-                array = array.concat(engines.slice(i + 1));
-                engines = array;
-                break;
             }
         }
 
         for (let i = 0; i < engines.length; i++) {
-            if (!engines[i].is_bridge) {
-                engines[i].is_bold = (current_engine != null &&
-                                      current_engine.name == engines[i].name) ?
-                                     true : false;
-            }
+            engines[i].is_bold = (current_engine != null &&
+                                  current_engine.name == engines[i].name) ?
+                                 true : false;
         }
 
         return engines;
@@ -400,7 +407,7 @@ Panel.prototype = {
         if (engines.length == 0 || engines[0] == null) {
             return false;
         }
-        if (!this._use_bridge_hotkey) {
+        if (!this._use_bridge_hotkey()) {
             this._add_im_off_menu_item();
         }
         return true;
@@ -416,7 +423,7 @@ Panel.prototype = {
             return;
         }
         if (item._engine != null) {
-            if (this._use_bridge_hotkey && item._engine.is_bridge) {
+            if (this._use_bridge_hotkey() && item._engine.is_bridge) {
                 let engines = this._bus.list_active_engines();
                 let current_engine = null;
                 current_engine = (this._focus_ic != null && this._focus_ic.get_engine());
@@ -424,14 +431,16 @@ Panel.prototype = {
                     current_engine = (engines && engines[0]);
                 }
                 if (current_engine != null &&
-                    current_engine.name == this._default_bridge_engine_name) {
+                    current_engine.name != null &&
+                    current_engine.name.substring(0, this._default_bridge_engine_name.length)
+                        ==  this._default_bridge_engine_name) {
                     this._disabled_engines_prev_id = this._disabled_engines_id;
                     this._disabled_engines_swapped = 0;
                 } else {
                     this._disabled_engines_prev_id = -1;
                 }
                 this._disabled_engines_id = item._engine.disabled_engines_id;
-                this._focus_ic.set_engine(this._default_bridge_engine_name);
+                this._focus_ic.set_engine(this._disabled_engines[this._disabled_engines_id].name);
             } else {
                 this._disabled_engines_prev_id = -1;
                 this._focus_ic.set_engine(item._engine.name);
@@ -529,18 +538,79 @@ Panel.prototype = {
         this._set_im_icon(null, text);
     },
 
+    _get_model_from_layout: function(layout) {
+        let left_bracket = layout.indexOf('(');
+        let right_bracket = layout.indexOf(')');
+        if (left_bracket >= 0 && right_bracket > left_bracket) {
+            return [layout.substring(0, left_bracket) + layout.substring(right_bracket + 1, layout.length),
+                    layout.substring(left_bracket + 1, right_bracket)];
+        }
+        return [layout, 'default'];
+    },
+
+    _get_option_from_layout: function(layout) {
+        let left_bracket = layout.indexOf('[');
+        let right_bracket = layout.indexOf(']');
+        if (left_bracket >= 0 && right_bracket > left_bracket) {
+            return [layout.substring(0, left_bracket) + layout.substring(right_bracket + 1, layout.length),
+                    layout.substring(left_bracket + 1, right_bracket)];
+        }
+        return [layout, 'default'];
+    },
+
+    _merge_models_and_options: function(cur_layout, engine_layout) {
+        let orig_layout = cur_layout;
+        let engine_model = 'default';
+        let engine_option = 'default';
+        [engine_layout, engine_model] =
+            this._get_model_from_layout(engine_layout);
+        [engine_layout, engine_option] =
+            this._get_option_from_layout(engine_layout);
+        if ((engine_model == null || engine_model == 'default') &&
+            (engine_option == null || engine_option == 'default')) {
+            return cur_layout;
+        }
+        let cur_model = 'default';
+        let cur_option = 'default';
+        [cur_layout, cur_model] =
+            this._get_model_from_layout(cur_layout);
+        [cur_layout, cur_option] =
+            this._get_option_from_layout(cur_layout);
+        // Currently implemented options only.
+        // Merging layouts and models are a little complicated.
+        // e.g. ja,ru + ja(kana) == ja,ru,ja(,,kana)
+        if (engine_option != null && engine_option != 'default') {
+            if (cur_option == null || cur_option == 'default') {
+                cur_option = engine_option;
+            }
+            else if (cur_option != null && cur_option != 'default') {
+                cur_option = cur_option + ',' + engine_option;
+            }
+            if (cur_model != null && cur_model != 'default') {
+                cur_layout = cur_layout + '(' + cur_model + ')';
+            }
+            if (cur_option != null && cur_option != 'default') {
+                cur_layout = cur_layout + '[' + cur_option + ']';
+            }
+            return cur_layout
+        }
+        return orig_layout
+    },
+
     _engine_get_layout_wrapper: function(engine, changed_state) {
         const xkb_prefix = 'xkb:layout:';
         if (engine.name != null &&
             engine.name.substring(0, xkb_prefix.length) == xkb_prefix &&
-            !this._use_bridge_hotkey) {
+            !this._use_bridge_hotkey()) {
             return engine.layout;
         } else if (engine.name != null &&
             engine.name.substring(0, xkb_prefix.length) == xkb_prefix &&
-            this._use_bridge_hotkey &&
-            engine.name != this._default_bridge_engine_name) {
+            this._use_bridge_hotkey() &&
+            engine.name != null &&
+            engine.name.substring(0, this._default_bridge_engine_name.length)
+                != this._default_bridge_engine_name) {
             return engine.layout;
-        } else if (this._use_bridge_hotkey &&
+        } else if (this._use_bridge_hotkey() &&
             this._disabled_engines_id >= 0 &&
             this._disabled_engines != null &&
             this._disabled_engines_id < this._disabled_engines.length) {
@@ -558,13 +628,28 @@ Panel.prototype = {
                 }
             }
             let retval = this._disabled_engines[this._disabled_engines_id].layout
+            if (engine.layout != null && 
+                engine.layout.substring(0, "default".length) == "default") {
+                return this._merge_models_and_options(retval, engine.layout);
+            }
             return retval;
+        } else if (engine.layout != null && 
+                   engine.layout.substring(0, "default".length) == "default") {
+            return engine.layout;
         } else {
             return 'default';
         }
     },
 
-    _set_default_layout_engine: function() {
+    _factory_create_engine_cb: function(factory, engine_name) {
+        factory._id++;
+        return IBus.Engine.new(engine_name,
+                               "/org/freedesktop/IBus/XKBDefaultEngine/"
+                                   + factory._id,
+                               factory.get_connection());
+    },
+
+    _set_default_layout_engine: function(use_bridge_hotkey) {
         let default_layout = this._default_layout;
         let default_model = this._default_model;
 
@@ -609,23 +694,60 @@ Panel.prototype = {
                                                        layout,
                                                        _("Default Layout"),
                                                        model,
-                                                       model_desc);
+                                                       model_desc,
+                                                       this._default_bridge_engine_name);
                 this._disabled_engines[this._disabled_engines.length] = engine;
             }
             this._xkb_group_id = this._xkblayout.get_group();
             this._disabled_engines_id = this._xkb_group_id;
+            if (!use_bridge_hotkey) {
+                return;
+            }
+            if (this._disabled_engines != null && this._disabled_engines != []) {
+                let component = IBus.Component.new("org.freedesktop.IBus.XKB",
+                                                   _("XKB Component"),
+                                                   "1.0",
+                                                   "GPL",
+                                                   "Takao Fujiwara",
+                                                   "https://github.com/fujiwarat/ibus/tree/gjs",
+                                                   "/usr/libexec/ibus-engine-xkb --xml",
+                                                   "ibus");
+                for (let i = 0; i < this._disabled_engines.length; i++) {
+                    component.add_engine(this._disabled_engines[i]);
+                }
+                let factory = IBus.Factory.new(this._bus.get_connection());
+                factory._id = 0
+                factory.connect("create-engine",
+                                Lang.bind(this, this._factory_create_engine_cb));
+                this._bus.register_component(component);
+                // Saved component globally so that engines are not unref by g-s
+                this._disabled_engines_component = component;
+            }
         }
-        if (this._focus_ic == null) {
+        if (!use_bridge_hotkey) {
             return;
         }
-        if (!this._focus_ic.is_enabled()) {
-            this._focus_ic.set_engine(this._default_bridge_engine_name);
+        if (this._disabled_engines != null && this._disabled_engines != []) {
+            if (!this._focus_ic == null) {
+                return;
+            }
+            let engine = this._focus_ic.get_engine();
+            if (engine == null) {
+                if (this._disabled_engines_id < 0) {
+                    this._disabled_engines_id = 0;
+                }
+                if (this._disabled_engines_id < this._disabled_engines.length) {
+                    this._focus_ic.focus_in();
+                    this._focus_ic.set_engine(this._disabled_engines[this._disabled_engines_id].name);
+                }
+            } else if (engine != null && !this._focus_ic.is_enabled()) {
+                this._focus_ic.focus_in();
+                this._focus_ic.enable();
+            }
         }
     },
 
     _focus_in_bridge_hotkey: function(enabled, reset) {
-        this._set_default_layout_engine();
-
         if (enabled == false) {
             if (reset) {
                 this.reset();
@@ -639,12 +761,6 @@ Panel.prototype = {
             let engine = this._focus_ic.get_engine();
             if (engine) {
                 let im_icon = engine.language.substring(0,2);
-                if (engine.name == this._default_bridge_engine_name &&
-                    this._disabled_engines != null &&
-                    this._disabled_engines_id < this._disabled_engines.length) {
-                    let id = this._disabled_engines_id;
-                    im_icon = this._disabled_engines[id].language.substring(0,2);
-                }
                 if (engine.language == 'other') {
                     im_icon = '+@'
                 }
@@ -788,7 +904,9 @@ Panel.prototype = {
             this._active_engine = null;
         }
 
-        if (this._use_bridge_hotkey) {
+        let use_bridge_hotkey = this._use_bridge_hotkey();
+        this._set_default_layout_engine(use_bridge_hotkey);
+        if (use_bridge_hotkey) {
             if (this._xkb_group_id != this._xkblayout.get_group()) {
                 this._xkb_group_id = this._xkblayout.get_group();
                 this._disabled_engines_id = this._xkb_group_id;
@@ -804,7 +922,7 @@ Panel.prototype = {
         this._focus_ic = null;
         this._language_bar.set_enabled(false);
 
-        if (this._use_bridge_hotkey) {
+        if (this._use_bridge_hotkey()) {
             this._focus_in_bridge_hotkey(false, false);
         } else {
             this._focus_in_on_off_hotkey(false, false);
@@ -819,7 +937,7 @@ Panel.prototype = {
         let enabled = this._focus_ic.is_enabled();
         this._language_bar.set_enabled(enabled);
 
-        if (this._use_bridge_hotkey) {
+        if (this._use_bridge_hotkey()) {
             this._focus_in_bridge_hotkey(enabled, true);
         } else {
             this._focus_in_on_off_hotkey(enabled, true);

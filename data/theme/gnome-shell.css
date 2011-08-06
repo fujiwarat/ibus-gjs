@@ -93,12 +93,12 @@ StTooltip StLabel {
 /* PopupMenu */
 
 .popup-menu-boxpointer {
-    -arrow-border-radius: 9px;
+    -arrow-border-radius: 8px;
     -arrow-background-color: rgba(0,0,0,0.9);
     -arrow-border-width: 2px;
-    -arrow-border-color: #5f5f5f;
-    -arrow-base: 30px;
-    -arrow-rise: 15px;
+    -arrow-border-color: #a5a5a5;
+    -arrow-base: 24px;
+    -arrow-rise: 11px;
 }
 
 .popup-menu {
@@ -264,7 +264,7 @@ StTooltip StLabel {
 }
 
 .panel-corner:active,
-.panel-corner:checked,
+.panel-corner:overview,
 .panel-corner:focus {
     -panel-corner-inner-border-color: rgba(255,255,255,0.8);
 }
@@ -301,7 +301,7 @@ StTooltip StLabel {
 }
 
 .panel-button:active,
-.panel-button:checked,
+.panel-button:overview,
 .panel-button:focus {
     border-image: url("panel-button-border.svg") 10 10 0 2;
     background-image: url("panel-button-highlight-wide.svg");
@@ -319,6 +319,10 @@ StTooltip StLabel {
 .panel-button:checked > .system-status-icon,
 .panel-button:focus > .system-status-icon {
     icon-shadow: black 0px 2px 2px;
+}
+
+.panel-menu {
+    -boxpointer-gap: 4px
 }
 
 /* The rounded panel corners we draw don't
@@ -1035,12 +1039,13 @@ StTooltip StLabel {
 }
 
 .summary-boxpointer {
-    -arrow-border-radius: 9px;
+    -arrow-border-radius: 8px;
     -arrow-background-color: rgba(0,0,0,0.9);
     -arrow-border-width: 2px;
-    -arrow-border-color: #5f5f5f;
-    -arrow-base: 30px;
-    -arrow-rise: 15px;
+    -arrow-border-color: #a5a5a5;
+    -arrow-base: 24px;
+    -arrow-rise: 11px;
+    color: white;
 }
 
 .summary-boxpointer #notification {
@@ -1501,7 +1506,7 @@ StTooltip StLabel {
     border-radius: 24px;
     background-color: rgba(0.0, 0.0, 0.0, 0.9);
     border: 2px solid #868686;
-    color: #ffffff;
+    color: #babdb6;
 
     padding-right: 42px;
     padding-left: 42px;
@@ -1517,25 +1522,31 @@ StTooltip StLabel {
     border: 1px solid #8b8b8b;
     border-radius: 18px;
     font-size: 10.5pt;
+    color: white;
 
     margin-left: 10px;
     margin-right: 10px;
 
     padding-left: 32px;
     padding-right: 32px;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    padding-top: 6px;
+    padding-bottom: 6px;
 
     background-gradient-direction: vertical;
-    background-gradient-start: #29323b;
-    background-gradient-end: #121a24;
+    background-gradient-start: rgba(255, 255, 255, 0.2);
+    background-gradient-end: rgba(255, 255, 255, 0);
+}
+
+.modal-dialog-button:hover {
+    background-gradient-start: rgba(255, 255, 255, 0.3);
+    background-gradient-end: rgba(255, 255, 255, 0.1);
 }
 
 .modal-dialog-button:active,
 .modal-dialog-button:pressed {
     border-color: #a5a5a5;
-    background-gradient-start: #121a24;
-    background-gradient-end: #29323b;
+    background-gradient-start: rgba(255, 255, 255, 0);
+    background-gradient-end: rgba(255, 255, 255, 0.2);
 }
 
 .modal-dialog-button:focus {
@@ -1806,9 +1817,16 @@ StTooltip StLabel {
 }
 
 .polkit-dialog-password-entry {
-    background-color: white;
+    background-gradient-start: rgb(236,236,236);
+    background-gradient-end: white;
+    background-gradient-direction: vertical;
     color: black;
     border-radius: 5px;
+    border: 2px solid #555753;
+}
+
+.polkit-dialog-password-entry:focus {
+    border: 2px solid #3465a4;
 }
 
 .polkit-dialog-error-label {

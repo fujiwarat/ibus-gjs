@@ -7,12 +7,8 @@ const PACKAGE_VERSION = '@PACKAGE_VERSION@';
 const GJS_VERSION = '@GJS_VERSION@';
 /* 1 if gnome-bluetooth is available, 0 otherwise */
 const HAVE_BLUETOOTH = @HAVE_BLUETOOTH@;
-/* 1 if ibus is available, 0 otherwise */
-const HAVE_IBUS = @HAVE_IBUS@;
 /* true if ibus-xkb is available, false otherwise */
 const HAVE_IBUS_XKB = @HAVE_IBUS_XKB@;
-/* The version of IBus */
-const IBUS_VERSION = '@IBUS_VERSION@';
 /* The path of IBus prefix */
 const IBUS_PREFIX = '@IBUS_PREFIX@';
 /* The path of IBus pkgdatadir */

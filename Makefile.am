@@ -25,11 +25,16 @@ SUBDIRS = js extensions po
 EXTRA_DIST =		\
 	autogen.sh	\
 	data/theme/gnome-shell.css \
+	ibus-gjs.spec.in \
 	$(NULL)
 
 # These are files checked into Git that we don't want to distribute
 DIST_EXCLUDE =					\
 	.gitignore				\
+	$(NULL)
+
+DISTCLEANFILES = \
+	stamp-h2 \
 	$(NULL)
 
 dist-hook:

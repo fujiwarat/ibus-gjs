@@ -38,12 +38,6 @@ nobase_dist_js_DATA = 	\
 	ui/status/ibus/xkbLayout.js	\
 	$(NULL)
 
-EXTRA_DIST = \
-	misc/config.js.in		\
-	ui/status/ibus/panel.js.in	\
-	ui/status/ibus/xkbLayout.js.in	\
-	$(NULL)
-
 ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
 	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
 	    sed -e "s|Config.IBUS_XKB|'$(IBUS_XKB)'|g" \
@@ -62,3 +56,13 @@ ui/status/ibus/panel.js: ui/status/ibus/panel.js.in
 	    cp $< $@; \
 	fi;
 
+EXTRA_DIST = \
+	misc/config.js.in		\
+	ui/status/ibus/panel.js.in	\
+	ui/status/ibus/xkbLayout.js.in	\
+	$(NULL)
+
+CLEANFILES = \
+	ui/status/ibus/panel.js		\
+	ui/status/ibus/xkbLayout.js	\
+	$(NULL)

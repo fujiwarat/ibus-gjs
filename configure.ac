@@ -96,41 +96,33 @@ fi
 AC_MSG_CHECKING([for IBus parameters])
 IBUS_PC_NAME=ibus-1.0
 if $PKG_CONFIG --exists $IBUS_PC_NAME ; then
-    IBUS_VERSION=`$PKG_CONFIG --modversion $IBUS_PC_NAME`
     IBUS_PREFIX=`$PKG_CONFIG --variable prefix $IBUS_PC_NAME`
     IBUS_PKGDATADIR=`$PKG_CONFIG --variable pkgdatadir $IBUS_PC_NAME`
     IBUS_XKB=`$PKG_CONFIG --variable ibus_xkb $IBUS_PC_NAME`
     HAVE_IBUS_XKB=`$PKG_CONFIG --variable have_ibus_xkb $IBUS_PC_NAME`
-    HAVE_IBUS=1
     if test x"$HAVE_IBUS_XKB" != xtrue ; then
         HAVE_IBUS_XKB=false
     fi
     AC_MSG_RESULT([yes
-                   IBUS_VERSION=$IBUS_VERSION
                    IBUS_PKGDATADIR=$IBUS_PKGDATADIR
                    IBUS_PREFIX=$IBUS_PREFIX
                    IBUS_XKB=$IBUS_XKB
                    HAVE_IBUS_XKB=$HAVE_IBUS_XKB])
 else
-    IBUS_VERSION=
     IBUS_PREFIX=$prefix
     IBUS_PKGDATADIR=$datadir/ibus
     IBUS_XKB=
     HAVE_IBUS_XKB=false
-    HAVE_IBUS=0
     AC_MSG_RESULT([no
-                   IBUS_VERSION=$IBUS_VERSION
                    IBUS_PKGDATADIR=$IBUS_PKGDATADIR
                    IBUS_PREFIX=$IBUS_PREFIX
                    IBUS_XKB=$IBUS_XKB
                    HAVE_IBUS_XKB=$HAVE_IBUS_XKB])
 fi
-AC_SUBST(IBUS_VERSION)
 AC_SUBST(IBUS_PREFIX)
 AC_SUBST(IBUS_PKGDATADIR)
 AC_SUBST(IBUS_XKB)
 AC_SUBST(HAVE_IBUS_XKB)
-AC_SUBST(HAVE_IBUS)
 
 # define GETTEXT_* variables
 GETTEXT_PACKAGE=ibus-gjs
@@ -154,7 +146,6 @@ Build options:
   Version                   $VERSION
   Install prefix            $prefix
   Enable standalone         $ENABLE_STANDALONE
-  IBus version              $IBUS_VERSION
   IBus PKGDATADIR           $IBUS_PKGDATADIR
   IBus PREFIX               $IBUS_PREFIX
   HAVE IBus XKB             $HAVE_IBUS_XKB

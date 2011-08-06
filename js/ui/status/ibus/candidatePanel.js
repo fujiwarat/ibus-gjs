@@ -145,10 +145,13 @@ StCandidateArea.prototype = {
             return;
         }
 
-        for (let i = 0; j < labels.length && i < this._labels.length; i++) {
+        for (let i = 0; i < labels.length && i < this._labels.length; i++) {
+            /* Use a ClutterActor attribute of Shell's theme instead of
+             * Pango.AttrList for the lookup window GUI and 
+             * can ignore 'attrs' simply from IBus engines?
+             */
             let [text, attrs] = labels[i];
             this._labels[i][0].set_text(text);
-            this._labels[i][0].set_attributes(attrs);
         }
     },
 

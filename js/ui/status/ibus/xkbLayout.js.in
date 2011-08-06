@@ -28,6 +28,8 @@ const Util = imports.misc.util;
 const _ = imports.ui.status.ibus.common._;
 
 const XKB_SESSION_TIME_OUT = 30.0;
+const ICON_KEYBOARD = 'input-keyboard-symbolic';
+const DEFAULT_BRIDGE_ENGINE_NAME = "xkb:layout:default:";
 
 function _trySpawnWithPipes(argv) {
     let retval = [false, null, null, -1];
@@ -108,7 +110,17 @@ XKBLayout.prototype = {
         let left_bracket = layout.indexOf('(');
         let right_bracket = layout.indexOf(')');
         if (left_bracket >= 0 && right_bracket > left_bracket) {
-            return [layout.substring(0, left_bracket),
+            return [layout.substring(0, left_bracket) + layout.substring(right_bracket + 1, layout.length),
+                    layout.substring(left_bracket + 1, right_bracket)];
+        }
+        return [layout, 'default'];
+    },
+
+    _get_option_from_layout: function(layout) {
+        let left_bracket = layout.indexOf('[');
+        let right_bracket = layout.indexOf(']');
+        if (left_bracket >= 0 && right_bracket > left_bracket) {
+            return [layout.substring(0, left_bracket) + layout.substring(right_bracket + 1, layout.length),
                     layout.substring(left_bracket + 1, right_bracket)];
         }
         return [layout, 'default'];
@@ -234,9 +246,20 @@ XKBLayout.prototype = {
         if (option != null) {
             option = option + '';
             if (option == 'default') {
+                let engine_option = 'default';
+                [layout, engine_option] = this._get_option_from_layout(layout);
+                if (engine_option != null && engine_option != 'default') {
+                    option = this._default_option;
+                    if (option == null) {
+                        option = engine_option;
+                    } else {
+                        option = option + ',' + engine_option;
+                    }
+                    this._time_lag_session_xkb_option = false;
+                }
+            }
+            if (option == 'default') {
                 option = this._default_option;
-            } else {
-                this._time_lag_session_xkb_option = false;
             }
         }
         let need_us_layout = false;
@@ -350,7 +373,9 @@ XKBLayout.prototype = {
     },
 };
 
-function engine_desc_new(lang, layout, layout_desc, variant, variant_desc) {
+function engine_desc_new(lang, layout, layout_desc,
+                         variant, variant_desc,
+                         name_prefix) {
     let name = null;
     let longname = layout;
     let desc = null;
@@ -366,21 +391,36 @@ function engine_desc_new(lang, layout, layout_desc, variant, variant_desc) {
     if (variant_desc == undefined) {
         variant_desc = null;
     }
+    if (name_prefix == undefined) {
+        name_prefix = 'xkb:layout:';
+    }
     if (variant_desc != null) {
-        longname = variant_desc
+        longname = variant_desc;
     } else if (layout != null && variant != null) {
-        longname = layout + " - " + variant
+        longname = layout + " - " + variant;
     } else if (layout_desc != null) {
-        longname = layout_desc
+        longname = layout_desc;
     }
     if (variant != null) {
-        name = "xkb:layout:" + layout + ":" + variant
-        desc = "XKB " + layout + "(" + variant + ") keyboard layout"
-        engine_layout = layout + "(" + variant + ")"
+        name = name_prefix + layout + ":" + variant;
+        desc = "XKB " + layout + "(" + variant + ") keyboard layout";
+        engine_layout = layout + "(" + variant + ")";
     } else {
-        name = "xkb:layout:" + layout
-        desc = "XKB " + layout + " keyboard layout"
-        engine_layout = layout
+        name = name_prefix + layout;
+        desc = "XKB " + layout + " keyboard layout";
+        engine_layout = layout;
+    }
+
+    let icon = 'ibus-engine';
+    let default_bridge_engine_name = DEFAULT_BRIDGE_ENGINE_NAME;
+    try {
+        default_bridge_engine_name = IBus.get_default_bridge_engine_name();
+    } catch (e) {
+        // This feature is not available.
+    }
+
+    if (name_prefix == default_bridge_engine_name) {
+        icon = ICON_KEYBOARD;
     }
 
     engine = new IBus.EngineDesc({ name: name,
@@ -389,7 +429,7 @@ function engine_desc_new(lang, layout, layout_desc, variant, variant_desc) {
                                    language: lang,
                                    license: "LGPL2.1",
                                    author: "Takao Fujiwara <takao.fujiwara1@gmail.com>",
-                                   icon: "ibus-engine",
+                                   icon: icon,
                                    layout: engine_layout });
     return engine
 }
