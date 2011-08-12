@@ -146,7 +146,6 @@ Panel.prototype = {
         this._disabled_engines_prev_id = -1;
         this._disabled_engines_swapped = 0;
         this._xkb_group_id = -1;
-        this._disabled_engines_component = null;
 
         this._xkblayout = new XKBLayout.XKBLayout(this._config);
         /* Currently GLib.Variant is not implemented. bug #622344 */
@@ -284,36 +283,29 @@ Panel.prototype = {
         this._create_shell_menu_for_popup();
     },
 
-    _change_bridge_engine_to_group_layouts: function(engines, current_engine) {
-        for (let i = 0; i < engines.length; i++) {
-            engines[i].is_bridge = false;
-            engines[i].is_bold = false;
+    _get_disabled_engine: function(engine) {
+        if (this._disabled_engines == null) {
+            return null;
         }
 
-        for (let i = 0; i < engines.length; i++) {
-            if (this._use_bridge_hotkey() &&
-                engines[i].name != null &&
-                engines[i].name.substring(0, this._default_bridge_engine_name.length)
-                    == this._default_bridge_engine_name  &&
-                this._disabled_engines != null) {
-                engines[i].is_bridge = true;
-                for (let j = 0; j < this._disabled_engines.length ; j++) {
-                    let kb_engine = this._disabled_engines[j];
-                    if (engines[i].name == kb_engine.name) {
-                        engines[i].disabled_engines_id = j;
-                        break;
-                    }
-                }
+        engine.disabled_engines_id = -1
+        let kb_engine = null;
+
+        for (let j = 0; j < this._disabled_engines.length; j++) {
+            kb_engine = this._disabled_engines[j];
+            if (engine.name == kb_engine.name) {
+                engine.disabled_engines_id = j;
+                break;
             }
         }
 
-        for (let i = 0; i < engines.length; i++) {
-            engines[i].is_bold = (current_engine != null &&
-                                  current_engine.name == engines[i].name) ?
-                                 true : false;
+        if (engine.disabled_engines_id == -1) {
+            return null;
         }
 
-        return engines;
+        kb_engine = this._disabled_engines[engine.disabled_engines_id];
+        kb_engine.disabled_engines_id = engine.disabled_engines_id;
+        return kb_engine;
     },
 
     _check_engines_have_duplicated_lang: function(engines) {
@@ -394,14 +386,35 @@ Panel.prototype = {
         if (current_engine == null) {
             current_engine = (engines && engines[0]);
         }
-        engines = this._change_bridge_engine_to_group_layouts(engines,
-                                                              current_engine);
         engines = this._check_engines_have_duplicated_lang(engines);
         for (let i = 0; i < engines.length; i++) {
             let engine = engines[i];
             if (engine == null) {
                 continue;
             }
+            let kb_engine = null;
+            if (engine.name != null &&
+                engine.name.substring(0, this._default_bridge_engine_name.length)
+                    == this._default_bridge_engine_name) {
+                if (this._use_bridge_hotkey()) {
+                    kb_engine = this._get_disabled_engine(engine);
+                } else {
+                    continue;
+                }
+            }
+            if (kb_engine != null) {
+                kb_engine.is_bridge = true;
+                kb_engine.has_duplicated_lang = engine.has_duplicated_lang;
+                kb_engine.is_bold = (current_engine != null &&
+                                     current_engine.name == engine.name) ?
+                                    true : false;
+                this._add_engine_in_menu(kb_engine);
+                continue;
+            }
+            engine.is_bridge = false;
+            engine.is_bold = (current_engine != null &&
+                              current_engine.name == engine.name) ?
+                             true : false;
             this._add_engine_in_menu(engine);
         }
         if (engines.length == 0 || engines[0] == null) {
@@ -641,14 +654,6 @@ Panel.prototype = {
         }
     },
 
-    _factory_create_engine_cb: function(factory, engine_name) {
-        factory._id++;
-        return IBus.Engine.new(engine_name,
-                               "/org/freedesktop/IBus/XKBDefaultEngine/"
-                                   + factory._id,
-                               factory.get_connection());
-    },
-
     _set_default_layout_engine: function(use_bridge_hotkey) {
         let default_layout = this._default_layout;
         let default_model = this._default_model;
@@ -690,39 +695,18 @@ Panel.prototype = {
                 if (model != null) {
                     model_desc = model_desc + " (" + model + ")";
                 }
+                let name = this._default_bridge_engine_name
+                    + "#" + i.toString();
                 let engine = XKBLayout.engine_desc_new(lang,
                                                        layout,
                                                        _("Default Layout"),
                                                        model,
                                                        model_desc,
-                                                       this._default_bridge_engine_name);
+                                                       name);
                 this._disabled_engines[this._disabled_engines.length] = engine;
             }
             this._xkb_group_id = this._xkblayout.get_group();
             this._disabled_engines_id = this._xkb_group_id;
-            if (!use_bridge_hotkey) {
-                return;
-            }
-            if (this._disabled_engines != null && this._disabled_engines != []) {
-                let component = IBus.Component.new("org.freedesktop.IBus.XKB",
-                                                   _("XKB Component"),
-                                                   "1.0",
-                                                   "GPL",
-                                                   "Takao Fujiwara",
-                                                   "https://github.com/fujiwarat/ibus/tree/gjs",
-                                                   "/usr/libexec/ibus-engine-xkb --xml",
-                                                   "ibus");
-                for (let i = 0; i < this._disabled_engines.length; i++) {
-                    component.add_engine(this._disabled_engines[i]);
-                }
-                let factory = IBus.Factory.new(this._bus.get_connection());
-                factory._id = 0
-                factory.connect("create-engine",
-                                Lang.bind(this, this._factory_create_engine_cb));
-                this._bus.register_component(component);
-                // Saved component globally so that engines are not unref by g-s
-                this._disabled_engines_component = component;
-            }
         }
         if (!use_bridge_hotkey) {
             return;
@@ -760,6 +744,16 @@ Panel.prototype = {
         } else {
             let engine = this._focus_ic.get_engine();
             if (engine) {
+                let kb_engine = null;
+                if (this._use_bridge_hotkey() &&
+                    engine.name != null &&
+                    engine.name.substring(0, this._default_bridge_engine_name.length)
+                        == this._default_bridge_engine_name) {
+                    kb_engine = this._get_disabled_engine(engine);
+                }
+                if (kb_engine != null) {
+                    engine = kb_engine;
+                }
                 let im_icon = engine.language.substring(0,2);
                 if (engine.language == 'other') {
                     im_icon = '+@'

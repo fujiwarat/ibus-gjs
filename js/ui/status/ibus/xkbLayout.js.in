@@ -375,8 +375,7 @@ XKBLayout.prototype = {
 
 function engine_desc_new(lang, layout, layout_desc,
                          variant, variant_desc,
-                         name_prefix) {
-    let name = null;
+                         name) {
     let longname = layout;
     let desc = null;
     let engine_layout = null;
@@ -391,8 +390,8 @@ function engine_desc_new(lang, layout, layout_desc,
     if (variant_desc == undefined) {
         variant_desc = null;
     }
-    if (name_prefix == undefined) {
-        name_prefix = 'xkb:layout:';
+    if (name == undefined) {
+        name = null;
     }
     if (variant_desc != null) {
         longname = variant_desc;
@@ -401,12 +400,17 @@ function engine_desc_new(lang, layout, layout_desc,
     } else if (layout_desc != null) {
         longname = layout_desc;
     }
+    let name_prefix = 'xkb:layout:';
     if (variant != null) {
-        name = name_prefix + layout + ":" + variant;
+        if (name == null) {
+            name = name_prefix + layout + ":" + variant;
+        }
         desc = "XKB " + layout + "(" + variant + ") keyboard layout";
         engine_layout = layout + "(" + variant + ")";
     } else {
-        name = name_prefix + layout;
+        if (name == null) {
+            name = name_prefix + layout;
+        }
         desc = "XKB " + layout + " keyboard layout";
         engine_layout = layout;
     }
