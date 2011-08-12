@@ -13,6 +13,8 @@ Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 
+BuildRequires:  gjs
+BuildRequires:  gnome-shell
 BuildRequires:  ibus-devel >= %{ibus_version}
 BuildRequires:  intltool
 

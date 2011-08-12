@@ -59,8 +59,7 @@ SystemStatusLabelButton.prototype = {
         }
         this.menu = new PopupMenuNoOpenStateChanged(this.actor, St.Align.START,
                                                     St.Side.TOP, 0);
-        Main.chrome.addActor(this.menu.actor, { visibleInOverview: true,
-                                                affectsStruts: false });
+        Main.chrome.addActor(this.menu.actor, { affectsStruts: false });
         this.menu.actor.hide();
     },
 

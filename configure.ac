@@ -124,6 +124,55 @@ AC_SUBST(IBUS_PKGDATADIR)
 AC_SUBST(IBUS_XKB)
 AC_SUBST(HAVE_IBUS_XKB)
 
+# Check GNOME-Shell VERSION
+AC_ARG_WITH(gnome-shell-js-dir,
+    AS_HELP_STRING([--with-gnome-shell-js-dir[=$DIR]],
+        [Set js dir path (default: /usr/share/gnome-shell/js)]),
+    GNOME_SHELL_JS_DIR=$with_gnome_shell_js_dir,
+    GNOME_SHELL_JS_DIR="/usr/share/gnome-shell/js"
+)
+
+# versionCheck() in gnome-shell/js/ui/extensionSystem.js:
+#  @current must be in the format <major>.<minor>.<point>.<micro>
+#  <micro> is always ignored
+#  <point> is ignored if <minor> is even (so you can target the
+#  whole stable release)
+#  <minor> and <major> must match
+#  Each target version must be at least <major> and <minor>
+GJS=${GJS:-'gjs'}
+GET_JS_VERSION () {
+    VERSION_STRING=$1
+    CHECK_JS_VERSION_TEMPLATE="
+try {
+    const Config = imports.misc.config;
+    let required = ${VERSION_STRING};
+    let requiredArray = required.split('.');
+    if (requiredArray[[1]] == undefined) {
+        print (required);
+    }
+    else if (requiredArray[[1]] % 2 == 0) {
+        print (requiredArray[[0]] + '.' + requiredArray[[1]]);
+    }
+    else if (requiredArray[[2]] == undefined || requiredArray[[3]] == undefined) {
+        print (required);
+    }
+    else {
+        let version = requiredArray[[0]];
+        version = version + '.' + requiredArray[[1]];
+        version = version + '.' + requiredArray[[2]];
+        print (version);
+    }
+} catch (e) {
+}
+"
+    $GJS -I "$GNOME_SHELL_JS_DIR" -c "$CHECK_JS_VERSION_TEMPLATE"
+}
+
+GNOME_SHELL_VERSION=`GET_JS_VERSION 'Config.PACKAGE_VERSION'`
+GJS_VERSION=`GET_JS_VERSION 'Config.GJS_VERSION'`
+AC_SUBST(GNOME_SHELL_VERSION)
+AC_SUBST(GJS_VERSION)
+
 # define GETTEXT_* variables
 GETTEXT_PACKAGE=ibus-gjs
 AC_SUBST(GETTEXT_PACKAGE)
@@ -138,6 +187,7 @@ ibus-gjs.spec
 js/Makefile
 js/misc/config.js
 extensions/Makefile
+extensions/ibus-indicator@example.com/metadata.json
 ])
 
 AC_OUTPUT
@@ -150,5 +200,7 @@ Build options:
   IBus PREFIX               $IBUS_PREFIX
   HAVE IBus XKB             $HAVE_IBUS_XKB
   IBUS XKB                  $IBUS_XKB
+  GNOME_SHELL_VERSION       $GNOME_SHELL_VERSION
+  GJS_VERSION               $GJS_VERSION
 ])
 

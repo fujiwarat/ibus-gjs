@@ -35,6 +35,7 @@ DIST_EXCLUDE =					\
 
 DISTCLEANFILES = \
 	stamp-h2 \
+	extensions/ibus-indicator@example.com/metadata.json \
 	$(NULL)
 
 dist-hook:

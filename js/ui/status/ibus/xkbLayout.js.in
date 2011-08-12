@@ -134,7 +134,7 @@ XKBLayout.prototype = {
         if (!result) {
             return null;
         }
-        let lines = output.split('\n');
+        let lines = ('' + output).split('\n');
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i];
             if (line.substring(0, str.length) == str) {

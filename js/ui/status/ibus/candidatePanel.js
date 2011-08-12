@@ -259,8 +259,7 @@ CandidatePanel.prototype = {
 
         this._pack_all_st_widgets();
         Main.chrome.addActor(this._st_candidate_panel,
-                             { visibleInOverview: true,
-                               affectsStruts: false });
+                             { affectsStruts: false });
         this._check_show_states();
     },
 
