@@ -140,6 +140,7 @@ AC_ARG_WITH(gnome-shell-js-dir,
 #  <minor> and <major> must match
 #  Each target version must be at least <major> and <minor>
 GJS=${GJS:-'gjs'}
+GREP=${GREP:-'grep'}
 GET_JS_VERSION () {
     VERSION_STRING=$1
     CHECK_JS_VERSION_TEMPLATE="
@@ -165,7 +166,12 @@ try {
 } catch (e) {
 }
 "
-    $GJS -I "$GNOME_SHELL_JS_DIR" -c "$CHECK_JS_VERSION_TEMPLATE"
+    # Added a workaround with tail.
+    # GJS 0.7.14 has unnecessary strings of
+    # "DEBUG: Command line: gjs" and
+    # "DEBUG: Creating new context to eval console script"
+    $GJS -I "$GNOME_SHELL_JS_DIR" -c "$CHECK_JS_VERSION_TEMPLATE" |\
+        $GREP -v "DEBUG:"
 }
 
 GNOME_SHELL_VERSION=`GET_JS_VERSION 'Config.PACKAGE_VERSION'`
