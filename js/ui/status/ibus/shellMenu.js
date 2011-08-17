@@ -39,14 +39,14 @@ ShellMenu.prototype = {
         PropItem.PropItem.prototype._init.call(this, prop);
 
         this._menu = new PopupMenu.PopupSubMenuMenuItem(prop.get_label().get_text());
-        this._create_items(this._prop.get_sub_props());
-        Common.actor_set_sensitive(this._menu.actor,
-                                   this._prop.get_sensitive(),
-                                   this._menu.label);
+        this._createItems(this._prop.get_sub_props());
+        Common.actorSetSensitive(this._menu.actor,
+                                 this._prop.get_sensitive(),
+                                 this._menu.label);
     },
 
-    _create_items: function(props) {
-        let radio_group = [];
+    _createItems: function(props) {
+        let radioGroup = [];
         let item = null;
 
         for (let i = 0; props.get(i) != null; i++) {
@@ -56,14 +56,14 @@ ShellMenu.prototype = {
             } else if (prop.get_prop_type() == IBus.PropType.TOGGLE) {
                 item = new CheckShellMenuItem(prop);
             } else if (prop.get_prop_type() == IBus.PropType.RADIO) {
-                item = new RadioShellMenuItem(radio_group, prop);
-                radio_group[radio_group.length] = item;
-                for (let j = 0; j < radio_group.length; j++) {
-                    radio_group[j].set_group(radio_group);
+                item = new RadioShellMenuItem(radioGroup, prop);
+                radioGroup.push(item);
+                for (let j = 0; j < radioGroup.length; j++) {
+                    radioGroup[j].setGroup(radioGroup);
                 }
             } else if (prop.get_prop_type() == IBus.PropType.SEPARATOR) {
                 item = new SeparatorShellMenuItem();
-                radio_group = [];
+                radioGroup = [];
             } else if (prop.get_prop_type() == IBus.PropType.MENU) {
                 item = new ShellMenu(prop);
             } else {
@@ -71,17 +71,17 @@ ShellMenu.prototype = {
             }
 
             if (prop.get_tooltip()) {
-                item.set_tooltip_text(prop.get_tooltip().get_text());
+                item.setTooltipText(prop.get_tooltip().get_text());
             }
-            item.set_sensitive(prop.get_sensitive());
+            item.setSensitive(prop.get_sensitive());
             if (prop.get_visible()) {
                 item.show();
             } else {
                 item.hide();
             }
 
-            this._menu.menu.addMenuItem(item.get_raw());
-            this._sub_items[this._sub_items.length] = item;
+            this._menu.menu.addMenuItem(item.getRaw());
+            this._subItems.push(item);
 
             if (prop.get_prop_type() != IBus.PropType.NORMAL &&
                 prop.get_prop_type() != IBus.PropType.TOGGLE &&
@@ -89,43 +89,43 @@ ShellMenu.prototype = {
                 continue;
             }
             item.connect('property-activate',
-                         Lang.bind(this, this._on_item_property_activate));
+                         Lang.bind(this, this._onItemPropertyActivate));
         }
     },
 
-    _property_clicked: function(item, prop) {
+    _propertyClicked: function(item, prop) {
     },
 
-    _on_item_property_activate: function (w, n, s) {
+    _onItemPropertyActivate: function (w, n, s) {
         this.emit('property-activate', n, s);
     },
 
-    add_menu_item: function(menu_item) {
-        this._box.add(menu_item.actor);
-        menu_item._active_change_id = menu_item.connect('active-changed', Lang.bind(this, function (menu_item, active) {
-            if (active && this._active_menu_item != menu_item) {
-                if (this._active_menu_item)
-                    this._active_menu_item.setActive(false);
-                this._active_menu_item = menu_item;
-                this.emit('active-changed', menu_item);
-            } else if (!active && this._active_menu_item == menu_item) {
-                this._active_menu_item = null;
+    addMenuItem: function(menuItem) {
+        this._box.add(menuItem.actor);
+        menuItem._activeChangeId = menuItem.connect('active-changed', Lang.bind(this, function (menuItem, active) {
+            if (active && this._activeMenuItem != menuItem) {
+                if (this._activeMenuItem)
+                    this._activeMenuItem.setActive(false);
+                this._activeMenuItem = menuItem;
+                this.emit('active-changed', menuItem);
+            } else if (!active && this._activeMenuItem == menuItem) {
+                this._activeMenuItem = null;
                 this.emit('active-changed', null);
             }
         }));
-        menu_item._activate_id = menu_item.connect('activate', Lang.bind(this, function (menu_item, event) {
-            this.emit('activate', menu_item);
+        menuItem._activateId = menuItem.connect('activate', Lang.bind(this, function (menuItem, event) {
+            this.emit('activate', menuItem);
             this.close();
         }));
-        menu_item.connect('destroy', Lang.bind(this, function(emitter) {
-            menu_item.disconnect(menu_item._activate_id);
-            menu_item.disconnect(menu_item._active_change_id);
-            if (menu_item == this._active_menu_item)
-                this._active_menu_item = null;
+        menuItem.connect('destroy', Lang.bind(this, function(emitter) {
+            menuItem.disconnect(menuItem._activateId);
+            menuItem.disconnect(menuItem._activeChangeId);
+            if (menuItem == this._activeMenuItem)
+                this._activeMenuItem = null;
         }));
     },
 
-    get_raw: function() {
+    getRaw: function() {
         return this._menu;
     },
 
@@ -133,10 +133,10 @@ ShellMenu.prototype = {
         this._menu.actor.show();
     },
 
-    set_sensitive: function(sensitive) {
-        Common.actor_set_sensitive(this._menu.actor,
-                                   sensitive,
-                                   this._menu.label);
+    setSensitive: function(sensitive) {
+        Common.actorSetSensitive(this._menu.actor,
+                                 sensitive,
+                                 this._menu.label);
     },
 };
 
@@ -153,7 +153,7 @@ ImageShellMenuItem.prototype = {
         PropItem.PropItem.prototype._init.call(this, prop);
         this._item = new PopupMenu.PopupImageMenuItem(this._prop.get_label().get_text(),
                                                       this._prop.get_icon());
-        this._item.connect('activate', Lang.bind(this, this._on_activate));
+        this._item.connect('activate', Lang.bind(this, this._onActivate));
 
         if (this._prop.get_visible()) {
             this._item.actor.show();
@@ -162,14 +162,14 @@ ImageShellMenuItem.prototype = {
         }
     },
 
-    _on_activate: function() {
+    _onActivate: function() {
         this.emit('property-activate', this._prop.get_key(), this._prop.get_state());
     },
 
-    property_changed: function() {
-        Common.actor_set_sensitive(this._item.actor,
-                                   this._prop.get_sensitive(),
-                                   this._item.label);
+    propertyChanged: function() {
+        Common.actorSetSensitive(this._item.actor,
+                                 this._prop.get_sensitive(),
+                                 this._item.label);
         if (this._prop.get_visible()) {
             this._item.actor.show();
         } else {
@@ -177,7 +177,7 @@ ImageShellMenuItem.prototype = {
         }
     },
 
-    get_raw: function() {
+    getRaw: function() {
         return this._item;
     },
 
@@ -193,23 +193,23 @@ ImageShellMenuItem.prototype = {
         this._item.destroy();
     },
 
-    set_sensitive: function(sensitive) {
-        Common.actor_set_sensitive(this._item.actor,
-                                   sensitive,
-                                   this._item.label);
+    setSensitive: function(sensitive) {
+        Common.actorSetSensitive(this._item.actor,
+                                 sensitive,
+                                 this._item.label);
     },
 
-    set_tooltip_text: function(text) {
+    setTooltipText: function(text) {
         /* Probably we do not need tooltip for clutter. */
         //this._item.actor.tooltip_text = text;
         //this._item.actor.has_tooltip = true;
     },
 
-    set_submenu: function(submenu) {
+    setSubmenu: function(submenu) {
         this._item.addActor(submenu.actor, null, null);
     },
 
-    set_label: function(label) {
+    setLabel: function(label) {
         this._item.label.set_text(label);
     },
 };
@@ -228,7 +228,7 @@ CheckShellMenuItem.prototype = {
         this._item = new PopupMenu.PopupSwitchMenuItem(this._prop.get_label().get_text(),
                                                        this._prop.get_state() == IBus.PropState.CHECKED);
 
-        this._item.connect('activate', Lang.bind(this, this._on_activate));
+        this._item.connect('activate', Lang.bind(this, this._onActivate));
 
         if (this._prop.get_visible()) {
             this._item.actor.show();
@@ -237,7 +237,7 @@ CheckShellMenuItem.prototype = {
         }
     },
 
-    _on_activate: function() {
+    _onActivate: function() {
         // Do not send property-activate to engine in case the event is
         // sent from engine.
         let do_emit = false;
@@ -257,9 +257,9 @@ CheckShellMenuItem.prototype = {
         }
     },
 
-    property_changed: function() {
+    propertyChanged: function() {
         this._item.setToggleState(this._prop.get_state() == IBus.PropState.CHECKED);
-        this._item.set_sensitive(this._prop.sensitive);
+        this._item.setSensitive(this._prop.sensitive);
         if (this._prop.get_visible()) {
             this._item.actor.show();
         } else {
@@ -267,7 +267,7 @@ CheckShellMenuItem.prototype = {
         }
     },
 
-    get_raw: function() {
+    getRaw: function() {
         return this._item;
     },
 
@@ -283,23 +283,23 @@ CheckShellMenuItem.prototype = {
         this._item.destroy();
     },
 
-    set_sensitive: function(sensitive) {
-        Common.actor_set_sensitive(this._item.actor,
-                                   sensitive,
-                                   this._item.label);
+    setSensitive: function(sensitive) {
+        Common.actorSetSensitive(this._item.actor,
+                                 sensitive,
+                                 this._item.label);
     },
 
-    set_tooltip_text: function(text) {
+    setTooltipText: function(text) {
         /* Probably we do not need tooltip for clutter. */
         //this._item.actor.tooltip_text = text;
         //this._item.actor.has_tooltip = true;
     },
 
-    set_submenu: function(submenu) {
+    setSubmenu: function(submenu) {
         this._item.addActor(submenu.actor, null, null);
     },
 
-    set_label: function(label) {
+    setLabel: function(label) {
         this._item.label.set_text(label);
     },
 };
@@ -320,7 +320,7 @@ RadioShellMenuItem.prototype = {
         this._item = new PopupMenu.PopupMenuItem(this._prop.get_label().get_text());
         this._item.state = (this._prop.get_state() == IBus.PropState.CHECKED);
         this._item.setShowDot(this._item.state);
-        this._item.connect('activate', Lang.bind(this, this._on_activate));
+        this._item.connect('activate', Lang.bind(this, this._onActivate));
 
         if (prop.get_visible()) {
             this._item.actor.show();
@@ -329,7 +329,7 @@ RadioShellMenuItem.prototype = {
         }
     },
 
-    _on_activate: function() {
+    _onActivate: function() {
         this._item.state = true;
         // Do not send property-activate to engine in case the event is
         // sent from engine.
@@ -340,7 +340,7 @@ RadioShellMenuItem.prototype = {
         this._prop.set_state(IBus.PropState.CHECKED);
         for (let i = 0; i < this._group.length; i++) {
             if (i != this._id) {
-                this._group[i].set_state(false);
+                this._group[i].setState(false);
             }
         }
         if (do_emit) {
@@ -348,9 +348,9 @@ RadioShellMenuItem.prototype = {
         }
     },
 
-    property_changed: function() {
+    propertyChanged: function() {
         this._item.setToggleState(this._prop.get_state() == IBus.PropState.CHECKED);
-        this._item.set_sensitive(this._prop.get_sensitive());
+        this._item.setSensitive(this._prop.get_sensitive());
         if (this._prop.get_visible()) {
             this._item.actor.show();
         } else {
@@ -358,7 +358,7 @@ RadioShellMenuItem.prototype = {
         }
     },
 
-    get_raw: function() {
+    getRaw: function() {
         return this._item;
     },
 
@@ -374,31 +374,31 @@ RadioShellMenuItem.prototype = {
         this._item.destroy();
     },
 
-    set_sensitive: function(sensitive) {
-        Common.actor_set_sensitive(this._item.actor,
-                                   sensitive,
-                                   this._item.label);
+    setSensitive: function(sensitive) {
+        Common.actorSetSensitive(this._item.actor,
+                                 sensitive,
+                                 this._item.label);
     },
 
-    set_tooltip_text: function(text) {
+    setTooltipText: function(text) {
         /* Probably we do not need tooltip for clutter. */
         //this._item.actor.tooltip_text = text;
         //this._item.actor.has_tooltip = true;
     },
 
-    set_submenu: function(submenu) {
+    setSubmenu: function(submenu) {
         this._item.addActor(submenu.actor, null, null);
     },
 
-    set_label: function(label) {
+    setLabel: function(label) {
         this._item.label.set_text(label);
     },
 
-    set_group: function(group) {
+    setGroup: function(group) {
         this._group = group;
     },
 
-    set_state: function(state) {
+    setState: function(state) {
         this._item.state = state;
         let do_emit = false;
         if (this._item.state) {
@@ -432,7 +432,7 @@ SeparatorShellMenuItem.prototype = {
         this._item = new PopupMenu.PopupSeparatorMenuItem();
     },
 
-    get_raw: function() {
+    getRaw: function() {
         return this._item;
     },
 

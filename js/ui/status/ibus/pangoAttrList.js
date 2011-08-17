@@ -22,7 +22,7 @@ const Pango = imports.gi.Pango;
 const GLib = imports.gi.GLib;
 const IBus = imports.gi.IBus;
 
-function _utf8_next_char(p) {
+function _utf8NextChar(p) {
     let i = 0;
     if (p == null) {
         return null;
@@ -52,7 +52,7 @@ PangoAttrList.prototype = {
         /* gojbect-introspection 0.10.1 or latest is needed.
          * https://bugzilla.gnome.org/show_bug.cgi?id=633197 */
         /* gi/arg.c:gjs_value_from_g_argument() outputs the error
-         * "Unhandled type gunichar converting GArgument to JavaScript". */
+         * 'Unhandled type gunichar converting GArgument to JavaScript'. */
         /*
         } else if (str != null) {
             unistr = GLib.utf8_to_ucs4(str, -1, null, null);
@@ -61,57 +61,57 @@ PangoAttrList.prototype = {
         /*
         for (let i = 0; i < unistr.length; i++) {
             let c = unistr[i];
-            offsets[offsets.length] = offset;
+            offsets.push(offset);
             let buff = [];
             let length = GLib.unichar_to_utf8(c, buff);
             buff[0][length] = 0;
             offset += buff.length;
         }
-        offsets[offsets.length] = offset;
+        offsets.push(offset);
         */
         for (let i = 0; i < str.length; ) {
-            let substr = _utf8_next_char(str.substring(i));
-            offsets[offsets.length] = offset;
+            let substr = _utf8NextChar(str.substring(i));
+            offsets.push(offset);
             offset += str.substring(i).length - substr.length;
             i += str.substring(i).length - substr.length;
         }
-        offsets[offsets.length] = offset;
+        offsets.push(offset);
         for (let i = 0; i < attrs.length; i++) {
             let attr = attrs[i];
-            let pango_attr = null;
-            let start_index = ((attr.start_index >= 0) ? attr.start_index : 0);
-            let end_index = ((attr.end_index >= 0) ? attr.end_index : 0);
-            start_index = ((start_index < offsets.length) ? offsets[start_index] : offsets[0]);
-            end_index = ((end_index < offsets.length) ? offsets[end_index] : offsets[0]);
+            let pangoAttr = null;
+            let startIndex = ((attr.start_index >= 0) ? attr.start_index : 0);
+            let endIndex = ((attr.end_index >= 0) ? attr.end_index : 0);
+            startIndex = ((startIndex < offsets.length) ? offsets[startIndex] : offsets[0]);
+            endIndex = ((endIndex < offsets.length) ? offsets[endIndex] : offsets[0]);
             if (attr.type == IBus.ATTR_TYPE_FOREGROUND) {
                 let r = (attr.value & 0x00ff0000) >> 8;
                 let g = (attr.value & 0x0000ff00);
                 let b = (attr.value & 0x000000ff) << 8;
                 /* Currently no definition to convert Pango.Attribute to
                  * Javascript object. No pango_attribute_get_type() */
-                //pango_attr = new Pango.AttrForeground(r, g, b,
-                //    start_index, end_index);
+                //pangoAttr = new Pango.AttrForeground(r, g, b,
+                //    startIndex, endIndex);
             } else if (attr.type == IBus.ATTR_TYPE_BACKGROUND) {
                 let r = (attr.value & 0x00ff0000) >> 8;
                 let g = (attr.value & 0x0000ff00);
                 let b = (attr.value & 0x000000ff) << 8;
                 /* Currently no definition to convert Pango.Attribute to
                  * Javascript object. No pango_attribute_get_type() */
-                //pango_attr = new Pango.AttrBackground(r, g, b,
-                //    start_index, end_index);
+                //pangoAttr = new Pango.AttrBackground(r, g, b,
+                //    startIndex, endIndex);
             } else if (attr.type == IBus.ATTR_TYPE_UNDERLINE) {
                 /* Currently no definition to convert Pango.Attribute to
                  * Javascript object. No pango_attribute_get_type() */
-                //pango_attr = new Pango.AttrUnderline(Math.floor(attr.value),
-                //    start_index, end_index);
+                //pangoAttr = new Pango.AttrUnderline(Math.floor(attr.value),
+                //    startIndex, endIndex);
             }
-            if (pango_attr != null) {
-                this._attrs.insert(pango_attr);
+            if (pangoAttr != null) {
+                this._attrs.insert(pangoAttr);
             }
         }
     },
 
-    get_raw: function() {
+    getRaw: function() {
         return this._attrs;
     },
 };

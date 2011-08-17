@@ -25,7 +25,6 @@ jsdir = $(datadir)/gnome-shell/js
 nobase_dist_js_DATA = 	\
 	ui/status/ibus/candidatePanel.js	\
 	ui/status/ibus/common.js	\
-	ui/status/ibus/handle.js	\
 	ui/status/ibus/indicator.js	\
 	ui/status/ibus/languageBar.js	\
 	ui/status/ibus/panel.js		\
@@ -49,8 +48,8 @@ ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
 
 ui/status/ibus/panel.js: ui/status/ibus/panel.js.in
 	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
-	    sed -e "s|imports.misc.config.IBUS_PREFIX|'$(IBUS_PREFIX)'|g" \
-	        -e "s|imports.misc.config.IBUS_PKGDATADIR|'$(IBUS_PKGDATADIR)'|g" \
+	    sed -e "s|Config.IBUS_PREFIX|'$(IBUS_PREFIX)'|g" \
+	        -e "s|Config.IBUS_PKGDATADIR|'$(IBUS_PKGDATADIR)'|g" \
 	    $< > $@; \
 	else \
 	    cp $< $@; \

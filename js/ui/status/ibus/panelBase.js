@@ -33,150 +33,150 @@ PanelBase.prototype = {
         this._bus = bus;
         this._panel = IBus.PanelService.new(bus.get_connection());
         this._panel.connect('set-cursor-location',
-                            Lang.bind(this, this.set_cursor_location));
+                            Lang.bind(this, this.setCursorLocation));
         this._panel.connect('update-preedit-text',
-                            Lang.bind(this, this.update_preedit_text));
+                            Lang.bind(this, this.updatePreeditText));
         this._panel.connect('show-preedit-text',
-                            Lang.bind(this, this.show_preedit_text));
+                            Lang.bind(this, this.showPreeditText));
         this._panel.connect('hide-preedit-text',
-                            Lang.bind(this, this.hide_preedit_text));
+                            Lang.bind(this, this.hidePreeditText));
         this._panel.connect('update-auxiliary-text',
-                            Lang.bind(this, this.update_auxiliary_text));
+                            Lang.bind(this, this.updateAuxiliaryText));
         this._panel.connect('show-auxiliary-text',
-                            Lang.bind(this, this.show_auxiliary_text));
+                            Lang.bind(this, this.showAuxiliaryText));
         this._panel.connect('hide-auxiliary-text',
-                            Lang.bind(this, this.hide_auxiliary_text));
+                            Lang.bind(this, this.hideAuxiliaryText));
         this._panel.connect('update-lookup-table',
-                            Lang.bind(this, this.update_lookup_table));
+                            Lang.bind(this, this.updateLookupTable));
         this._panel.connect('show-lookup-table',
-                            Lang.bind(this, this.show_lookup_table));
+                            Lang.bind(this, this.showLookupTable));
         this._panel.connect('hide-lookup-table',
-                            Lang.bind(this, this.hide_lookup_table));
+                            Lang.bind(this, this.hideLookupTable));
         this._panel.connect('page-up-lookup-table',
-                            Lang.bind(this, this.page_up_lookup_table));
+                            Lang.bind(this, this.pageUpLookupTable));
         this._panel.connect('page-down-lookup-table',
-                            Lang.bind(this, this.page_down_lookup_table));
+                            Lang.bind(this, this.pageDownLookupTable));
         this._panel.connect('cursor-up-lookup-table',
-                            Lang.bind(this, this.cursor_up_lookup_table));
+                            Lang.bind(this, this.cursorUpLookupTable));
         this._panel.connect('cursor-down-lookup-table',
-                            Lang.bind(this, this.cursor_down_lookup_table));
-        this._panel.connect('focus-in', Lang.bind(this, this.focus_in));
-        this._panel.connect('focus-out', Lang.bind(this, this.focus_out));
-        this._panel.connect('register-properties', Lang.bind(this, this.register_properties));
-        this._panel.connect('update-property', Lang.bind(this, this.update_property));
-        this._panel.connect('state-changed', Lang.bind(this, this.state_changed));
+                            Lang.bind(this, this.cursorDownLookupTable));
+        this._panel.connect('focus-in', Lang.bind(this, this.focusIn));
+        this._panel.connect('focus-out', Lang.bind(this, this.focusOut));
+        this._panel.connect('register-properties', Lang.bind(this, this.registerProperties));
+        this._panel.connect('update-property', Lang.bind(this, this.updateProperty));
+        this._panel.connect('state-changed', Lang.bind(this, this.stateChanged));
     },
 
-    set_cursor_location: function(panel, x, y, w, h) {
+    setCursorLocation: function(panel, x, y, w, h) {
     },
 
-    update_preedit_text: function(panel, text, cursor_pos, visible) {
+    updatePreeditText: function(panel, text, cursorPos, visible) {
     },
 
-    show_preedit_text: function(panel) {
+    showPreeditText: function(panel) {
     },
 
-    hide_preedit_text: function(panel) {
+    hidePreeditText: function(panel) {
     },
 
-    update_auxiliary_text: function(panel, text, visible) {
+    updateAuxiliaryText: function(panel, text, visible) {
     },
 
-    show_auxiliary_text: function(panel) {
+    showAuxiliaryText: function(panel) {
     },
 
-    hide_auxiliary_text: function(panel) {
+    hideAuxiliaryText: function(panel) {
     },
 
-    update_lookup_table: function(panel, lookup_table, visible) {
+    updateLookupTable: function(panel, lookupTable, visible) {
     },
 
-    show_lookup_table: function(panel) {
+    showLookupTable: function(panel) {
     },
 
-    hide_lookup_table: function(panel) {
+    hideLookupTable: function(panel) {
     },
 
-    page_up_lookup_table: function(panel) {
+    pageUpLookupTable: function(panel) {
     },
 
-    page_down_lookup_table: function(panel) {
+    pageDownLookupTable: function(panel) {
     },
 
-    cursor_up_lookup_table: function(panel) {
+    cursorUpLookupTable: function(panel) {
     },
 
-    cursor_down_lookup_table: function(panel) {
+    cursorDownLookupTable: function(panel) {
     },
 
-    show_candidate_window: function(panel) {
+    showCandidateWindow: function(panel) {
     },
 
-    hide_candidate_window: function(panel) {
+    hideCandidateWindow: function(panel) {
     },
 
-    show_language_bar: function() {
+    showLanguageBar: function() {
     },
 
-    hide_language_bar: function() {
+    hideLanguageBar: function() {
     },
 
-    focus_in: function(panel, path) {
+    focusIn: function(panel, path) {
     },
 
-    focus_out: function(panel, path) {
+    focusOut: function(panel, path) {
     },
 
-    register_properties: function(panel, props) {
+    registerProperties: function(panel, props) {
     },
 
-    update_property: function(panel, prop) {
+    updateProperty: function(panel, prop) {
     },
 
-    state_changed: function(panel) {
+    stateChanged: function(panel) {
     },
 
     reset: function() {
     },
 
-    start_setup: function() {
+    startSetup: function() {
     },
 
-    page_up: function() {
+    pageUp: function() {
         this._panel.page_up();
     },
 
-    page_down: function() {
+    pageDown: function() {
         this._panel.page_down();
     },
 
-    cursor_up: function() {
+    cursorUp: function() {
         this._panel.cursor_up();
     },
 
-    cursor_down: function() {
+    cursorDown: function() {
         this._panel.cursor_down();
     },
 
-    candidate_clicked: function(index, button, state) {
+    candidateClicked: function(index, button, state) {
         this._panel.candidate_clicked(index, button, state);
     },
 
-    property_activate: function(prop_name, prop_state) {
-        this._panel.property_activate(prop_name, prop_state);
+    propertyActivate: function(propName, prop_state) {
+        this._panel.property_activate(propName, prop_state);
     },
 
-    property_show: function(prop_name) {
-        prop_name = new DBus.String(prop_name);
-        this._panel.property_show(prop_name);
+    propertyShow: function(propName) {
+        propName = new DBus.String(propName);
+        this._panel.property_show(propName);
     },
 
-    property_hide: function(prop_name) {
-        prop_name = new DBus.String(prop_name);
-        this._panel.property_hide(prop_name);
+    propertyHide: function(prop_name) {
+        propName = new DBus.String(propName);
+        this._panel.property_hide(propName);
     },
 
-    set_bus: function(bus) {
+    setBus: function(bus) {
         this._init(bus);
     },
 };

@@ -27,24 +27,16 @@ const PopupMenu = imports.ui.popupMenu;
 const Lightbox = imports.ui.lightbox;
 const Main = imports.ui.main;
 const Util = imports.misc.util;
-const IBUS_PREFIX = imports.misc.config.IBUS_PREFIX;
-const IBUS_PKGDATADIR = imports.misc.config.IBUS_PKGDATADIR;
+const Config = imports.misc.config;
 
 const CandidatePanel = imports.ui.status.ibus.candidatePanel;
 const LanguageBar = imports.ui.status.ibus.languageBar;
 const PanelBase = imports.ui.status.ibus.panelBase;
-
-const PopupImageMenuItemMarkup = imports.ui.status.ibus.popupMenu.PopupImageMenuItemMarkup;
+const IPopupMenu = imports.ui.status.ibus.popupMenu;
 const XKBLayout = imports.ui.status.ibus.xkbLayout;
 const Common = imports.ui.status.ibus.common;
-const _ = imports.ui.status.ibus.common._;
-const ORIENTATION_HORIZONTAL = imports.ui.status.ibus.common.ORIENTATION_HORIZONTAL;
-const ORIENTATION_VERTICAL   = imports.ui.status.ibus.common.ORIENTATION_VERTICAL;
 
-const ICON_KEYBOARD = XKBLayout.ICON_KEYBOARD;
-const DEFAULT_BRIDGE_ENGINE_NAME = XKBLayout.DEFAULT_BRIDGE_ENGINE_NAME;
 const ICON_ENGINE = 'ibus-engine';
-const LIGHTBOX_FADE_TIME = 0.1;
 
 
 function Panel(bus, indicator) {
@@ -56,51 +48,52 @@ Panel.prototype = {
 
     _init: function(bus, indicator) {
         this._indicator = indicator;
-        this._setup_pid = -1;
-        let prefix = IBUS_PREFIX;
-        let data_dir = IBUS_PKGDATADIR;
-        // this._icons_dir = data_dir + '/icons';
-        this._setup_cmd = prefix + '/bin/ibus-setup';
-        this._is_restart = false;
-        this._active_engine = null;
+        this._setupPid = -1;
+        let prefix = Config.IBUS_PREFIX;
+        let dataDir = Config.IBUS_PKGDATADIR;
+        // this._iconsDir = dataDir + '/icons';
+        this._setupCmd = prefix + '/bin/ibus-setup';
+        this._isRestart = false;
+        this._activeEngine = null;
 
-        if (!this._init_bus(bus)) {
+        if (!this._initBus(bus)) {
             return;
         }
 
-        this._language_bar = new LanguageBar.LanguageBar(indicator);
-        this._language_bar.connect('property-activate',
-                                   Lang.bind(this, this._on_language_bar_property_activate));
-        this._candidate_panel = new CandidatePanel.CandidatePanel();
-        this._candidate_panel.connect('cursor-up',
-                                      Lang.bind(this, function(widget) {
-                                          this.cursor_up();}));
-        this._candidate_panel.connect('cursor-down',
-                                      Lang.bind(this, function(widget) {
-                                          this.cursor_down();}));
-        this._candidate_panel.connect('page-up',
-                                      Lang.bind(this, function(widget) {
-                                          this.page_up();}));
-        this._candidate_panel.connect('page-down',
-                                      Lang.bind(this, function(widget) {
-                                          this.page_down();}));
-        this._candidate_panel.connect('candidate-clicked',
-                                      Lang.bind(this,
-                                                function(widget, index, button, state) {
-                                                    this.candidate_clicked(index, button, state);}));
+        this._languageBar = new LanguageBar.LanguageBar(indicator);
+        this._languageBar.connect('property-activate',
+                                  Lang.bind(this, this._onLanguageBarPropertyActivate));
+        this._candidatePanel = new CandidatePanel.CandidatePanel();
+        this._candidatePanel.connect('cursor-up',
+                                     Lang.bind(this, function(widget) {
+                                         this.cursorUp();}));
+        this._candidatePanel.connect('cursor-down',
+                                     Lang.bind(this, function(widget) {
+                                         this.cursorDown();}));
+        this._candidatePanel.connect('page-up',
+                                     Lang.bind(this, function(widget) {
+                                         this.pageUp();}));
+        this._candidatePanel.connect('page-down',
+                                     Lang.bind(this, function(widget) {
+                                         this.pageDown();}));
+        this._candidatePanel.connect('candidate-clicked',
+                                     Lang.bind(this,
+                                               function(widget, index, button, state) {
+                                         this.candidateClicked(index, button, state);}));
 
-        this._indicator.setIcon(ICON_KEYBOARD);
+        this._indicator.setIcon(XKBLayout.ICON_KEYBOARD);
         this._indicator.actor.connect('button-press-event',
-                                      Lang.bind(this, this._on_shell_panel_button_press_event));
+                                      Lang.bind(this, this._onShellPanelButtonPressEvent));
 
         // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
         // config value now.
-        //this._config_load_lookup_table_orientation();
+        //this._configLoadLookupTableOrientation();
     },
 
-    _init_bus: function(bus) {
+    _initBus: function(bus) {
         this._bus = bus;
-        this._focus_ic = null;
+        this._useSysLayout = this._bus.get_use_sys_layout();
+        this._focusIC = null;
 
         // connect bus signal
         this._config = this._bus.get_config();
@@ -112,8 +105,8 @@ Panel.prototype = {
         PanelBase.PanelBase.prototype._init.call(this, bus);
 
         this._config.connect('value-changed',
-                             Lang.bind(this, this._config_value_changed_cb));
-        // this._config.connect('reloaded', this._config_reloaded_cb);
+                             Lang.bind(this, this._configValueChangedCB));
+        // this._config.connect('reloaded', this._configReloadedCB);
 
         this._bus.get_connection().signal_subscribe('org.freedesktop.DBus',
                                                     'org.freedesktop.DBus',
@@ -121,42 +114,42 @@ Panel.prototype = {
                                                     '/org/freedesktop/DBus',
                                                     IBus.SERVICE_PANEL,
                                                     Gio.DBusSignalFlags.NONE,
-                                                    Lang.bind(this, this._name_owner_changed_cb),
+                                                    Lang.bind(this, this._nameOwnerChangedCB),
                                                     null,
                                                     null);
 
         // init xkb
-        this._default_layout = 'default';
-        this._default_model = 'default';
-        this._default_option = 'default';
-        this._use_bridge_hotkey_system = false;
+        this._defaultLayout = 'default';
+        this._defaultModel = 'default';
+        this._defaultOption = 'default';
+        this._useBridgeHotkeySystem = false;
         try {
-            this._use_bridge_hotkey_system = IBus.use_bridge_hotkey();
+            this._useBridgeHotkeySystem = IBus.use_bridge_hotkey();
         } catch (e) {
             // This feature is not available.
         }
-        this._default_bridge_engine_name = DEFAULT_BRIDGE_ENGINE_NAME;
+        this._defaultBridgeEngineName = XKBLayout.DEFAULT_BRIDGE_ENGINE_NAME;
         try {
-            this._default_bridge_engine_name = IBus.get_default_bridge_engine_name();
+            this._defaultBridgeEngineName = IBus.get_default_bridge_engine_name();
         } catch (e) {
             // This feature is not available.
         }
-        this._disabled_engines = null;
-        this._disabled_engines_id = -1;
-        this._disabled_engines_prev_id = -1;
-        this._disabled_engines_swapped = 0;
-        this._xkb_group_id = -1;
+        this._disabledEngines = null;
+        this._disabledEnginesID = -1;
+        this._disabledEnginesPrevID = -1;
+        this._disabledEnginesSwapped = 0;
+        this._xkbGroupID = -1;
 
         this._xkblayout = new XKBLayout.XKBLayout(this._config);
         /* Currently GLib.Variant is not implemented. bug #622344 */
-        let use_xkb = true;
+        let useXkb = true;
         /*
-        let use_xkb = this._config.get_value('general',
-                                             'use_system_keyboard_layout',
-                                             false);
+        let useXkb = this._config.get_value('general',
+                                            'use_system_keyboard_layout',
+                                            false);
         */
-        if (!use_xkb) {
-            this._xkblayout.use_xkb(use_xkb);
+        if (!useXkb) {
+            this._xkblayout.useXkb(useXkb);
         }
         let value = 'default';
         /*
@@ -169,13 +162,13 @@ Panel.prototype = {
         }
         if (value != 'default') {
             if (value.indexOf('(') >= 0) {
-                this._default_layout = value.split('(')[0];
-                this._default_model = value.split('(')[1].split(')')[0];
+                this._defaultLayout = value.split('(')[0];
+                this._defaultModel = value.split('(')[1].split(')')[0];
             } else {
-                this._default_layout = value;
-                this._default_model = null;
+                this._defaultLayout = value;
+                this._defaultModel = null;
             }
-            this._xkblayout.set_default_layout(value);
+            this._xkblayout.setDefaultLayout(value);
         }
         /*
         value = this._config.get_value('general',
@@ -186,14 +179,14 @@ Panel.prototype = {
             value = 'default';
         }
         if (value != 'default') {
-            this._xkblayout.set_default_option(value);
+            this._xkblayout.setDefaultOption(value);
         }
 
         return true;
     },
 
-    _use_bridge_hotkey: function() {
-        if (!this._use_bridge_hotkey_system) {
+    _useBridgeHotkey: function() {
+        if (!this._useBridgeHotkeySystem) {
             return false;
         }
         if (this._config == null) {
@@ -202,13 +195,13 @@ Panel.prototype = {
         // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
         // config value now.
         /*
-        return this._config.get_value("general/hotkey", "use_bridge_hotkey",
+        return this._config.get_value('general/hotkey', 'use_bridge_hotkey',
                                       true);
         */
         return true;
     },
 
-    _config_value_changed_cb: function(bus, section, name, value) {
+    _configValueChangedCB: function(bus, section, name, value) {
         global.log ('config changed:' + section + '-' + name + ':' + value);
         if (section != 'panel') {
             return;
@@ -217,100 +210,101 @@ Panel.prototype = {
         // config value now.
         /*
         if (name == 'lookup_table_orientation') {
-            this._config_load_lookup_table_orientation();
+            this._configLoadLookupTableOrientation();
         }
         */
     },
 
-    _config_load_lookup_table_orientation: function() {
-        let value = this._config.get_value("panel", "lookup_table_orientation", 0);
-        let orientation = ORIENTATION_VERTICAL;
-        if (value in [ORIENTATION_HORIZONTAL, ORIENTATION_VERTICAL])
+    _configLoadLookupTableOrientation: function() {
+        let value = this._config.get_value('panel', 'lookup_table_orientation', 0);
+        let orientation = Common.ORIENTATION_VERTICAL;
+        if (value in [Common.ORIENTATION_HORIZONTAL,
+                      Common.ORIENTATION_VERTICAL])
             orientation = value;
-        if (this._candidate_panel)
-            this._candidate_panel.set_orientation(orientation);
+        if (this._candidatePanel)
+            this._candidatePanel.setOrientation(orientation);
     },
 
-    _config_reloaded_cb: function(bus) {
+    _configReloadedCB: function(bus) {
     },
 
-    _name_owner_changed_cb: function(bus, name, oldname, newname) {
-        this._config_reloaded_cb(this._bus);
+    _nameOwnerChangedCB: function(bus, name, oldname, newname) {
+        this._configReloadedCB(this._bus);
     },
 
-    _create_shell_menu_for_im: function() {
-        if (this._focus_ic == null) {
+    _createShellMenuForIM: function() {
+        if (this._focusIC == null) {
             let item = new PopupMenu.PopupImageMenuItem(_("No input window"),
                                                         'dialog-information');
             this._indicator.menu.addMenuItem(item);
             return true;
         } else {
-            this._language_bar.create_im_menu_shell();
-            return this._create_im_menu_shell();
+            this._languageBar.createIMMenuShell();
+            return this._createIMMenuShell();
         }
     },
 
-    _create_shell_menu_for_popup: function() {
+    _createShellMenuForPopup: function() {
         let item = new PopupMenu.PopupImageMenuItem(_("Preferences"),
                                                     'preferences-desktop');
         item.connect('activate',
-                     Lang.bind(this, this._preferences_item_shell_activate_cb));
+                     Lang.bind(this, this._preferencesItemShellActivateCB));
         this._indicator.menu.addMenuItem(item);
         let item = new PopupMenu.PopupImageMenuItem(_("Keyboard configuration"),
                                                     'preferences-desktop');
         item.connect('activate',
-                     Lang.bind(this, this._g_c_c_item_shell_activate_cb));
+                     Lang.bind(this, this._g_c_cItemShellActivateCB));
         this._indicator.menu.addMenuItem(item);
         item = new PopupMenu.PopupImageMenuItem(_("Restart"), 'reload');
         item.connect('activate',
-                     Lang.bind(this, this._restart_item_shell_activate_cb));
+                     Lang.bind(this, this._restartItemShellActivateCB));
         this._indicator.menu.addMenuItem(item);
         item = new PopupMenu.PopupImageMenuItem(_("Quit"), 'exit');
         item.connect('activate',
-                     Lang.bind(this, this._quit_item_shell_activate_cb));
+                     Lang.bind(this, this._quitItemShellActivateCB));
         this._indicator.menu.addMenuItem(item);
     },
 
-    _on_language_bar_property_activate: function(widget, prop_name, prop_state) {
-        this.property_activate(prop_name, prop_state);
+    _onLanguageBarPropertyActivate: function(widget, prop_name, prop_state) {
+        this.propertyActivate(prop_name, prop_state);
     },
 
-    _on_shell_panel_button_press_event: function(actor, event) {
+    _onShellPanelButtonPressEvent: function(actor, event) {
         this._indicator.menu.removeAll();
-        if (this._create_shell_menu_for_im()) {
+        if (this._createShellMenuForIM()) {
             this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         }
-        this._create_shell_menu_for_popup();
+        this._createShellMenuForPopup();
     },
 
-    _get_disabled_engine: function(engine) {
-        if (this._disabled_engines == null) {
+    _getDisabledEngine: function(engine) {
+        if (this._disabledEngines == null) {
             return null;
         }
 
-        engine.disabled_engines_id = -1
-        let kb_engine = null;
+        engine.disabledEnginesID = -1
+        let kbEngine = null;
 
-        for (let j = 0; j < this._disabled_engines.length; j++) {
-            kb_engine = this._disabled_engines[j];
-            if (engine.name == kb_engine.name) {
-                engine.disabled_engines_id = j;
+        for (let j = 0; j < this._disabledEngines.length; j++) {
+            kbEngine = this._disabledEngines[j];
+            if (engine.name == kbEngine.name) {
+                engine.disabledEnginesID = j;
                 break;
             }
         }
 
-        if (engine.disabled_engines_id == -1) {
+        if (engine.disabledEnginesID == -1) {
             return null;
         }
 
-        kb_engine = this._disabled_engines[engine.disabled_engines_id];
-        kb_engine.disabled_engines_id = engine.disabled_engines_id;
-        return kb_engine;
+        kbEngine = this._disabledEngines[engine.disabledEnginesID];
+        kbEngine.disabledEnginesID = engine.disabledEnginesID;
+        return kbEngine;
     },
 
-    _check_engines_have_duplicated_lang: function(engines) {
+    _checkEnginesHaveDuplicatedLang: function(engines) {
         for (let i = 0; i < engines.length; i++) {
-            engines[i].has_duplicated_lang = false;
+            engines[i].hasDuplicatedLang = false;
         }
 
         for (let i = 0; i < engines.length - 1; i++) {
@@ -327,8 +321,8 @@ Panel.prototype = {
                 }
                 let lang_j = IBus.get_language_name(engine_j.language);
                 if (lang_i == lang_j) {
-                    engine_i.has_duplicated_lang = true;
-                    engine_j.has_duplicated_lang = true;
+                    engine_i.hasDuplicatedLang = true;
+                    engine_j.hasDuplicatedLang = true;
                 }
             }
         }
@@ -336,24 +330,24 @@ Panel.prototype = {
         return engines;
     },
 
-    _add_engine_in_menu: function(engine) {
+    _addEngineInMenu: function(engine) {
         let item = null;
-        let full_lang = engine.language;
-        let lang = IBus.get_language_name(full_lang);
+        let fullLang = engine.language;
+        let lang = IBus.get_language_name(fullLang);
         if (lang == null) {
-            full_lang = '+@';
+            fullLang = '+@';
             lang = _("Other");
         }
-        let text = full_lang.substring(0,2) + '  ' + lang;
-        if (engine.has_duplicated_lang) {
+        let text = fullLang.substring(0,2) + '  ' + lang;
+        if (engine.hasDuplicatedLang) {
                 text = text + ' (' + engine.longname + ')';
         }
         let icon = ICON_ENGINE;
         if (engine.icon != null) {
             icon = engine.icon;
         }
-        if (engine.is_bold) {
-            item = new PopupImageMenuItemMarkup('<b>' + text + '</b>', icon);
+        if (engine.isBold) {
+            item = new IPopupMenu.PopupImageMenuItemMarkup('<b>' + text + '</b>', icon);
             item.setShowDot(true);
         } else {
             item = new PopupMenu.PopupImageMenuItem(text, icon);
@@ -361,594 +355,592 @@ Panel.prototype = {
         }
         item._engine = engine;
         item.connect('activate',
-                     Lang.bind(this, this._im_menu_item_shell_activate_cb));
+                     Lang.bind(this, this._imMenuItemShellActivateCB));
         this._indicator.menu.addMenuItem(item);
     },
 
-    _add_im_off_menu_item: function() {
+    _addIMOffMenuItem: function() {
         let item = new PopupMenu.PopupImageMenuItem(_("Turn off input method"),
                                                     'window-close');
         item._engine = null;
         item.connect('activate',
-                     Lang.bind(this, this._im_menu_item_shell_activate_cb));
-        if (this._focus_ic == null || !this._focus_ic.is_enabled()) {
-            Common.actor_set_sensitive(item.actor, false, item.label);
+                     Lang.bind(this, this._imMenuItemShellActivateCB));
+        if (this._focusIC == null || !this._focusIC.is_enabled()) {
+            Common.actorSetSensitive(item.actor, false, item.label);
         } else {
-            Common.actor_set_sensitive(item.actor, true, item.label);
+            Common.actorSetSensitive(item.actor, true, item.label);
         }
         this._indicator.menu.addMenuItem(item);
     },
 
-    _create_im_menu_shell: function() {
+    _createIMMenuShell: function() {
         let engines = this._bus.list_active_engines();
-        let current_engine = null;
-        current_engine = (this._focus_ic != null && this._focus_ic.get_engine());
-        if (current_engine == null) {
-            current_engine = (engines && engines[0]);
+        let currentEngine = null;
+        currentEngine = (this._focusIC != null && this._focusIC.get_engine());
+        if (currentEngine == null) {
+            currentEngine = (engines && engines[0]);
         }
-        engines = this._check_engines_have_duplicated_lang(engines);
+        engines = this._checkEnginesHaveDuplicatedLang(engines);
         for (let i = 0; i < engines.length; i++) {
             let engine = engines[i];
             if (engine == null) {
                 continue;
             }
-            let kb_engine = null;
+            let kbEngine = null;
             if (engine.name != null &&
-                engine.name.substring(0, this._default_bridge_engine_name.length)
-                    == this._default_bridge_engine_name) {
-                if (this._use_bridge_hotkey()) {
-                    kb_engine = this._get_disabled_engine(engine);
+                engine.name.substring(0, this._defaultBridgeEngineName.length)
+                    == this._defaultBridgeEngineName) {
+                if (this._useBridgeHotkey()) {
+                    kbEngine = this._getDisabledEngine(engine);
+                    if (kbEngine == null) {
+                        continue;
+                    }
                 } else {
                     continue;
                 }
             }
-            if (kb_engine != null) {
-                kb_engine.is_bridge = true;
-                kb_engine.has_duplicated_lang = engine.has_duplicated_lang;
-                kb_engine.is_bold = (current_engine != null &&
-                                     current_engine.name == engine.name) ?
-                                    true : false;
-                this._add_engine_in_menu(kb_engine);
+            if (kbEngine != null) {
+                kbEngine.isBridge = true;
+                kbEngine.hasDuplicatedLang = engine.hasDuplicatedLang;
+                kbEngine.isBold = (currentEngine != null &&
+                                   currentEngine.name == engine.name) ?
+                                  true : false;
+                this._addEngineInMenu(kbEngine);
                 continue;
             }
-            engine.is_bridge = false;
-            engine.is_bold = (current_engine != null &&
-                              current_engine.name == engine.name) ?
-                             true : false;
-            this._add_engine_in_menu(engine);
+            engine.isBridge = false;
+            engine.isBold = (currentEngine != null &&
+                             currentEngine.name == engine.name) ?
+                            true : false;
+            this._addEngineInMenu(engine);
         }
         if (engines.length == 0 || engines[0] == null) {
             return false;
         }
-        if (!this._use_bridge_hotkey()) {
-            this._add_im_off_menu_item();
+        if (!this._useBridgeHotkey()) {
+            this._addIMOffMenuItem();
         }
         return true;
     },
 
-    _im_menu_item_status_activate_cb: function(item) {
-        /* this._focus_ic is null on gnome-shell because focus-in event is 
-         * happened. So I moved set_engine in focus_in. */
-        if (this._focus_ic == null) {
+    _imMenuItemStatusActivateCB: function(item) {
+        /* this._focusIC is null on gnome-shell because focus-in event is 
+         * happened. So I moved set_engine in focusIn. */
+        if (this._focusIC == null) {
             if (item._engine != null) {
-                this._active_engine = item._engine;
+                this._activeEngine = item._engine;
             }
             return;
         }
         if (item._engine != null) {
-            if (this._use_bridge_hotkey() && item._engine.is_bridge) {
+            if (this._useBridgeHotkey() && item._engine.isBridge) {
                 let engines = this._bus.list_active_engines();
-                let current_engine = null;
-                current_engine = (this._focus_ic != null && this._focus_ic.get_engine());
-                if (current_engine == null) {
-                    current_engine = (engines && engines[0]);
+                let currentEngine = null;
+                currentEngine = (this._focusIC != null && this._focusIC.get_engine());
+                if (currentEngine == null) {
+                    currentEngine = (engines && engines[0]);
                 }
-                if (current_engine != null &&
-                    current_engine.name != null &&
-                    current_engine.name.substring(0, this._default_bridge_engine_name.length)
-                        ==  this._default_bridge_engine_name) {
-                    this._disabled_engines_prev_id = this._disabled_engines_id;
-                    this._disabled_engines_swapped = 0;
+                if (currentEngine != null &&
+                    currentEngine.name != null &&
+                    currentEngine.name.substring(0, this._defaultBridgeEngineName.length)
+                        ==  this._defaultBridgeEngineName) {
+                    this._disabledEnginesPrevID = this._disabledEnginesID;
+                    this._disabledEnginesSwapped = 0;
                 } else {
-                    this._disabled_engines_prev_id = -1;
+                    this._disabledEnginesPrevID = -1;
                 }
-                this._disabled_engines_id = item._engine.disabled_engines_id;
-                this._focus_ic.set_engine(this._disabled_engines[this._disabled_engines_id].name);
+                this._disabledEnginesID = item._engine.disabledEnginesID;
+                this._focusIC.set_engine(this._disabledEngines[this._disabledEnginesID].name);
             } else {
-                this._disabled_engines_prev_id = -1;
-                this._focus_ic.set_engine(item._engine.name);
+                this._disabledEnginesPrevID = -1;
+                this._focusIC.set_engine(item._engine.name);
             }
         } else {
-            this._disabled_engines_prev_id = -1;
-            this._focus_ic.disable();
+            this._disabledEnginesPrevID = -1;
+            this._focusIC.disable();
         }
     },
 
-    _im_menu_item_shell_activate_cb: function(item, event) {
-        this._im_menu_item_status_activate_cb(item);
+    _imMenuItemShellActivateCB: function(item, event) {
+        this._imMenuItemStatusActivateCB(item);
     },
 
-    _child_setup_watch_cb: function(pid, status, data) {
-        if (this._setup_pid == pid) {
-            this._setup_pid = -1;
+    _childSetupWatchCB: function(pid, status, data) {
+        if (this._setupPid == pid) {
+            this._setupPid = -1;
         }
     },
 
-    _preferences_item_shell_activate_cb: function(item, event, user_data) {
-        if (this._setup_pid != -1) {
+    _preferencesItemShellActivateCB: function(item, event, user_data) {
+        if (this._setupPid != -1) {
             try {
-                Util.trySpawnCommandLine('kill -10 ' + this._setup_pid.toString());
+                Util.trySpawnCommandLine('kill -10 ' + this._setupPid.toString());
                 return;
 
             } catch (e) {
-                this._setup_pid = -1;
+                this._setupPid = -1;
             }
         }
         let pid = GLib.spawn_async(null,
-                                   [this._setup_cmd, 'ibus-setup'],
+                                   [this._setupCmd, 'ibus-setup'],
                                    null,
                                    GLib.SpawnFlags.DO_NOT_REAP_CHILD, null,
                                    null)[1];
-        this._setup_pid = pid;
-        GLib.child_watch_add(0, this._setup_pid,
-                             Lang.bind(this, this._child_setup_watch_cb),
+        this._setupPid = pid;
+        GLib.child_watch_add(0, this._setupPid,
+                             Lang.bind(this, this._childSetupWatchCB),
                              null);
     },
 
-    _g_c_c_item_shell_activate_cb: function(item, event, user_data) {
+    _g_c_cItemShellActivateCB: function(item, event, user_data) {
         let app = Shell.AppSystem.get_default().get_app('gnome-region-panel.desktop');
         app.activate(-1);
     },
 
-    _restart_item_shell_activate_cb: function(item, event, user_data) {
-        this._is_restart = true;
+    _restartItemShellActivateCB: function(item, event, user_data) {
+        this._isRestart = true;
         this._bus.exit(true);
     },
 
-    _quit_item_shell_activate_cb: function(item, event, user_data) {
+    _quitItemShellActivateCB: function(item, event, user_data) {
         this._bus.exit(false);
     },
 
-    _set_im_icon: function(icon_name, label) {
-        if (icon_name == null) {
-            icon_name = ICON_ENGINE;
+    _setIMIcon: function(iconName, label) {
+        if (this._indicator == null) {
+            return;
         }
-        if (this._indicator != null) {
-            if (icon_name[0] == '/') {
-                let paths = null;
-                let n_elements = 0;
-                icon_name = GLib.path_get_basename(icon_name);
-                if (icon_name.indexOf('.') >= 0) {
-                    icon_name = icon_name.substr(0, icon_name.lastIndexOf('.'));
-                }
+        if (iconName == null) {
+            iconName = ICON_ENGINE;
+        }
+        if (iconName[0] == '/') {
+            let paths = null;
+            let n_elements = 0;
+            iconName = GLib.path_get_basename(iconName);
+            if (iconName.indexOf('.') >= 0) {
+                iconName = iconName.substr(0, iconName.lastIndexOf('.'));
             }
-            if (label != null) {
-                this._indicator.setLabel(label);
-            } else {
-                this._indicator.setIcon(icon_name);
-            }
+        }
+        if (label != null) {
+            this._indicator.setLabel(label);
         } else {
-            if (icon_name[0] == '/') {
-                this._status_icon.set_from_file(icon_name);
-            } else {
-                this._status_icon.set_from_icon_name(icon_name);
-            }
+            this._indicator.setIcon(iconName);
         }
     },
 
-    _set_im_name: function(name) {
-        this._language_bar.set_im_name(name);
+    _setIMName: function(name) {
+        this._languageBar.setIMName(name);
     },
 
-    _update_icon_with_property: function(prop) {
-        if (prop.get_key() != "InputMode") {
+    _updateIconWithProperty: function(prop) {
+        if (prop.get_key() != 'InputMode') {
             return;
         }
         let text = prop.get_label().get_text();
         if (text == null || text == '') {
             return;
         }
-        this._set_im_icon(null, text);
+        this._setIMIcon(null, text);
     },
 
-    _get_model_from_layout: function(layout) {
-        let left_bracket = layout.indexOf('(');
-        let right_bracket = layout.indexOf(')');
-        if (left_bracket >= 0 && right_bracket > left_bracket) {
-            return [layout.substring(0, left_bracket) + layout.substring(right_bracket + 1, layout.length),
-                    layout.substring(left_bracket + 1, right_bracket)];
+    _getModelFromLayout: function(layout) {
+        let leftBracket = layout.indexOf('(');
+        let rightBracket = layout.indexOf(')');
+        if (leftBracket >= 0 && rightBracket > leftBracket) {
+            return [layout.substring(0, leftBracket) + layout.substring(rightBracket + 1, layout.length),
+                    layout.substring(leftBracket + 1, rightBracket)];
         }
         return [layout, 'default'];
     },
 
-    _get_option_from_layout: function(layout) {
-        let left_bracket = layout.indexOf('[');
-        let right_bracket = layout.indexOf(']');
-        if (left_bracket >= 0 && right_bracket > left_bracket) {
-            return [layout.substring(0, left_bracket) + layout.substring(right_bracket + 1, layout.length),
-                    layout.substring(left_bracket + 1, right_bracket)];
+    _getOptionFromLayout: function(layout) {
+        let leftBracket = layout.indexOf('[');
+        let rightBracket = layout.indexOf(']');
+        if (leftBracket >= 0 && rightBracket > leftBracket) {
+            return [layout.substring(0, leftBracket) + layout.substring(rightBracket + 1, layout.length),
+                    layout.substring(leftBracket + 1, rightBracket)];
         }
         return [layout, 'default'];
     },
 
-    _merge_models_and_options: function(cur_layout, engine_layout) {
-        let orig_layout = cur_layout;
-        let engine_model = 'default';
-        let engine_option = 'default';
-        [engine_layout, engine_model] =
-            this._get_model_from_layout(engine_layout);
-        [engine_layout, engine_option] =
-            this._get_option_from_layout(engine_layout);
-        if ((engine_model == null || engine_model == 'default') &&
-            (engine_option == null || engine_option == 'default')) {
-            return cur_layout;
+    _mergeModelsAndOptions: function(curLayout, engineLayout) {
+        let origLayout = curLayout;
+        let engineModel = 'default';
+        let engineOption = 'default';
+        [engineLayout, engineModel] =
+            this._getModelFromLayout(engineLayout);
+        [engineLayout, engineOption] =
+            this._getOptionFromLayout(engineLayout);
+        if ((engineModel == null || engineModel == 'default') &&
+            (engineOption == null || engineOption == 'default')) {
+            return curLayout;
         }
-        let cur_model = 'default';
-        let cur_option = 'default';
-        [cur_layout, cur_model] =
-            this._get_model_from_layout(cur_layout);
-        [cur_layout, cur_option] =
-            this._get_option_from_layout(cur_layout);
+        let curModel = 'default';
+        let curOption = 'default';
+        [curLayout, curModel] =
+            this._getModelFromLayout(curLayout);
+        [curLayout, curOption] =
+            this._getOptionFromLayout(curLayout);
         // Currently implemented options only.
         // Merging layouts and models are a little complicated.
         // e.g. ja,ru + ja(kana) == ja,ru,ja(,,kana)
-        if (engine_option != null && engine_option != 'default') {
-            if (cur_option == null || cur_option == 'default') {
-                cur_option = engine_option;
+        if (engineOption != null && engineOption != 'default') {
+            if (curOption == null || curOption == 'default') {
+                curOption = engineOption;
             }
-            else if (cur_option != null && cur_option != 'default') {
-                cur_option = cur_option + ',' + engine_option;
+            else if (curOption != null && curOption != 'default') {
+                curOption = curOption + ',' + engineOption;
             }
-            if (cur_model != null && cur_model != 'default') {
-                cur_layout = cur_layout + '(' + cur_model + ')';
+            if (curModel != null && curModel != 'default') {
+                curLayout = curLayout + '(' + curModel + ')';
             }
-            if (cur_option != null && cur_option != 'default') {
-                cur_layout = cur_layout + '[' + cur_option + ']';
+            if (curOption != null && curOption != 'default') {
+                curLayout = curLayout + '[' + curOption + ']';
             }
-            return cur_layout
+            return curLayout
         }
-        return orig_layout
+        return origLayout
     },
 
-    _engine_get_layout_wrapper: function(engine, changed_state) {
-        const xkb_prefix = 'xkb:layout:';
+    _engineGetLayoutWrapper: function(engine, changedState) {
+        const xkbPrefix = 'xkb:layout:';
         if (engine.name != null &&
-            engine.name.substring(0, xkb_prefix.length) == xkb_prefix &&
-            !this._use_bridge_hotkey()) {
+            engine.name.substring(0, xkbPrefix.length) == xkbPrefix &&
+            !this._useBridgeHotkey()) {
             return engine.layout;
         } else if (engine.name != null &&
-            engine.name.substring(0, xkb_prefix.length) == xkb_prefix &&
-            this._use_bridge_hotkey() &&
+            engine.name.substring(0, xkbPrefix.length) == xkbPrefix &&
+            this._useBridgeHotkey() &&
             engine.name != null &&
-            engine.name.substring(0, this._default_bridge_engine_name.length)
-                != this._default_bridge_engine_name) {
+            engine.name.substring(0, this._defaultBridgeEngineName.length)
+                != this._defaultBridgeEngineName) {
             return engine.layout;
-        } else if (this._use_bridge_hotkey() &&
-            this._disabled_engines_id >= 0 &&
-            this._disabled_engines != null &&
-            this._disabled_engines_id < this._disabled_engines.length) {
-            if (changed_state && this._disabled_engines_prev_id != -1) {
-                // state_changed is always called twice because we change
+        } else if (this._useBridgeHotkey() &&
+            this._disabledEnginesID >= 0 &&
+            this._disabledEngines != null &&
+            this._disabledEnginesID < this._disabledEngines.length) {
+            if (changedState && this._disabledEnginesPrevID != -1) {
+                // stateChanged is always called twice because we change
                 // the engine. So the first two calls are ignored here.
-                if (this._disabled_engines_swapped < 2) {
-                    this._disabled_engines_swapped = 
-                        this._disabled_engines_swapped + 1;
+                if (this._disabledEnginesSwapped < 2) {
+                    this._disabledEnginesSwapped = 
+                        this._disabledEnginesSwapped + 1;
                 } else {
-                    let x = this._disabled_engines_prev_id;
-                    this._disabled_engines_prev_id = this._disabled_engines_id;
-                    this._disabled_engines_id = x;
-                    this._disabled_engines_swapped = 1;
+                    let x = this._disabledEnginesPrevID;
+                    this._disabledEnginesPrevID = this._disabledEnginesID;
+                    this._disabledEnginesID = x;
+                    this._disabledEnginesSwapped = 1;
                 }
             }
-            let retval = this._disabled_engines[this._disabled_engines_id].layout
+            let retval = this._disabledEngines[this._disabledEnginesID].layout;
             if (engine.layout != null && 
-                engine.layout.substring(0, "default".length) == "default") {
-                return this._merge_models_and_options(retval, engine.layout);
+                engine.layout.substring(0, 'default'.length) == 'default') {
+                return this._mergeModelsAndOptions(retval, engine.layout);
             }
             return retval;
         } else if (engine.layout != null && 
-                   engine.layout.substring(0, "default".length) == "default") {
+                   engine.layout.substring(0, 'default'.length) == 'default') {
             return engine.layout;
         } else {
             return 'default';
         }
     },
 
-    _set_default_layout_engine: function(use_bridge_hotkey) {
-        let default_layout = this._default_layout;
-        let default_model = this._default_model;
+    _setDefaultLayoutEngine: function(useBridgeHotkey) {
+        let defaultLayout = this._defaultLayout;
+        let defaultModel = this._defaultModel;
 
-        if (default_layout == 'default') {
-            default_layout = this._xkblayout.get_default_layout()[0];
-            default_model = this._xkblayout.get_default_layout()[1];
+        if (defaultLayout == 'default') {
+            defaultLayout = this._xkblayout.getDefaultLayout()[0];
+            defaultModel = this._xkblayout.getDefaultLayout()[1];
         }
-        if (default_model == 'default') {
-            default_model = this._xkblayout.get_default_layout()[1];
+        if (defaultModel == 'default') {
+            defaultModel = this._xkblayout.getDefaultLayout()[1];
         }
 
-        let layouts = default_layout.split(',');
+        let layouts = defaultLayout.split(',');
         let models = null;
-        if (default_model != null && default_model != '') {
-            models = default_model.split(',');
+        if (defaultModel != null && defaultModel != '') {
+            models = defaultModel.split(',');
         }
-        if (this._disabled_engines == null || this._disabled_engines == []) {
-            this._disabled_engines = [];
+        if (this._disabledEngines == null || this._disabledEngines == []) {
+            this._disabledEngines = [];
             for (let i = 0; layouts[i] != null; i++) {
                 let layout = layouts[i];
                 let registry = new IBus.XKBConfigRegistry();
                 let langs = registry.layout_lang_get_langs(layout);
                 let lang = 'en';
                 if (langs != null) {
-                    lang = langs[0] + "";
+                    lang = langs[0] + '';
                 }
                 let model = null;
                 if (i == 0) {
-                    layout = default_layout;
-                    model = default_model;
+                    layout = defaultLayout;
+                    model = defaultModel;
                 } else if (models != null && i < models.length) {
                     model = models[i];
                 }
                 if (model == '') {
                     model = null;
                 }
-                let model_desc = _("Default Layout");
+                let modelDesc = _("Default Layout");
                 if (model != null) {
-                    model_desc = model_desc + " (" + model + ")";
+                    modelDesc = modelDesc + ' (' + model + ')';
                 }
-                let name = this._default_bridge_engine_name
-                    + "#" + i.toString();
-                let engine = XKBLayout.engine_desc_new(lang,
-                                                       layout,
-                                                       _("Default Layout"),
-                                                       model,
-                                                       model_desc,
-                                                       name);
-                this._disabled_engines[this._disabled_engines.length] = engine;
+                let name = this._defaultBridgeEngineName
+                    + '#' + i.toString();
+                let engine = XKBLayout.engineDescNew(lang,
+                                                     layout,
+                                                     _("Default Layout"),
+                                                     model,
+                                                     modelDesc,
+                                                     name);
+                this._disabledEngines.push(engine);
             }
-            this._xkb_group_id = this._xkblayout.get_group();
-            this._disabled_engines_id = this._xkb_group_id;
+            this._xkbGroupID = this._xkblayout.getGroup();
+            this._disabledEngines_id = this._xkbGroupID;
         }
-        if (!use_bridge_hotkey) {
+        if (!useBridgeHotkey) {
             return;
         }
-        if (this._disabled_engines != null && this._disabled_engines != []) {
-            if (!this._focus_ic == null) {
+        if (this._disabledEngines != null && this._disabledEngines != []) {
+            if (!this._focusIC == null) {
                 return;
             }
-            let engine = this._focus_ic.get_engine();
+            let engine = this._focusIC.get_engine();
             if (engine == null) {
-                if (this._disabled_engines_id < 0) {
-                    this._disabled_engines_id = 0;
+                if (this._disabledEnginesID < 0) {
+                    this._disabledEnginesID = 0;
                 }
-                if (this._disabled_engines_id < this._disabled_engines.length) {
-                    this._focus_ic.focus_in();
-                    this._focus_ic.set_engine(this._disabled_engines[this._disabled_engines_id].name);
+                if (this._disabledEnginesID < this._disabledEngines.length) {
+                    this._focusIC.focus_in();
+                    this._focusIC.set_engine(this._disabledEngines[this._disabledEnginesID].name);
                 }
-            } else if (engine != null && !this._focus_ic.is_enabled()) {
-                this._focus_ic.focus_in();
-                this._focus_ic.enable();
+            } else if (engine != null && !this._focusIC.is_enabled()) {
+                this._focusIC.focus_in();
+                this._focusIC.enable();
             }
         }
     },
 
-    _focus_in_bridge_hotkey: function(enabled, reset) {
+    _focusInBridgeHotkey: function(enabled, reset) {
         if (enabled == false) {
             if (reset) {
                 this.reset();
             }
-            this._set_im_icon(ICON_KEYBOARD, null);
-            this._set_im_name(null);
-            if (this._bus.get_use_sys_layout()) {
-                this._xkblayout.set_layout();
+            this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
+            this._setIMName(null);
+            if (this._useSysLayout) {
+                this._xkblayout.setLayout();
             }
         } else {
-            let engine = this._focus_ic.get_engine();
+            let engine = this._focusIC.get_engine();
             if (engine) {
-                let kb_engine = null;
-                if (this._use_bridge_hotkey() &&
+                let kbEngine = null;
+                if (this._useBridgeHotkey() &&
                     engine.name != null &&
-                    engine.name.substring(0, this._default_bridge_engine_name.length)
-                        == this._default_bridge_engine_name) {
-                    kb_engine = this._get_disabled_engine(engine);
+                    engine.name.substring(0, this._defaultBridgeEngineName.length)
+                        == this._defaultBridgeEngineName) {
+                    kbEngine = this._getDisabledEngine(engine);
                 }
-                if (kb_engine != null) {
-                    engine = kb_engine;
+                if (kbEngine != null) {
+                    engine = kbEngine;
                 }
-                let im_icon = engine.language.substring(0,2);
+                let imIcon = engine.language.substring(0,2);
                 if (engine.language == 'other') {
-                    im_icon = '+@'
+                    imIcon = '+@';
                 }
-                if (engine.symbol != undefined && engine.symbol != "") {
-                    im_icon = engine.symbol;
+                if (engine.symbol != undefined && engine.symbol != '') {
+                    imIcon = engine.symbol;
                 }
-                this._set_im_icon(engine.icon, im_icon);
-                this._set_im_name(engine.longname);
-                if (this._bus.get_use_sys_layout()) {
-                    this._xkblayout.set_layout(this._engine_get_layout_wrapper(engine, reset));
+                this._setIMIcon(engine.icon, imIcon);
+                this._setIMName(engine.longname);
+                if (this._useSysLayout) {
+                    this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, reset));
                 }
             } else {
-                this._set_im_icon(ICON_KEYBOARD, null);
-                this._set_im_name(null);
-                if (this._bus.get_use_sys_layout()) {
-                    this._xkblayout.set_layout(this._engine_get_layout_wrapper(engine, reset));
+                this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
+                this._setIMName(null);
+                if (this._useSysLayout) {
+                    this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, reset));
                 }
             }
         }
     },
 
-    _focus_in_on_off_hotkey: function(enabled, reset) {
+    _focusInOnOffHotkey: function(enabled, reset) {
         if (enabled == false) {
             if (reset) {
                 this.reset();
             }
-            this._set_im_icon(ICON_KEYBOARD, null);
-            this._set_im_name(null);
-            if (this._bus.get_use_sys_layout()) {
-                this._xkblayout.set_layout();
+            this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
+            this._setIMName(null);
+            if (this._useSysLayout) {
+                this._xkblayout.setLayout();
             }
         } else {
-            let engine = this._focus_ic.get_engine();
+            let engine = this._focusIC.get_engine();
             if (engine) {
-                let im_icon = engine.language.substring(0,2);
+                let imIcon = engine.language.substring(0,2);
                 if (engine.language == 'other') {
-                    im_icon = '+@'
+                    imIcon = '+@';
                 }
-                if (engine.symbol != undefined && engine.symbol != "") {
-                    im_icon = engine.symbol;
+                if (engine.symbol != undefined && engine.symbol != '') {
+                    imIcon = engine.symbol;
                 }
-                this._set_im_icon(engine.icon, im_icon);
-                this._set_im_name(engine.longname);
-                if (this._bus.get_use_sys_layout()) {
-                    this._xkblayout.set_layout(this._engine_get_layout_wrapper(engine, false));
+                this._setIMIcon(engine.icon, imIcon);
+                this._setIMName(engine.longname);
+                if (this._useSysLayout) {
+                    this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, false));
                 }
             } else {
-                this._set_im_icon(ICON_KEYBOARD, null);
-                this._set_im_name(null);
-                if (this._bus.get_use_sys_layout()) {
-                    this._xkblayout.set_layout();
+                this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
+                this._setIMName(null);
+                if (this._useSysLayout) {
+                    this._xkblayout.setLayout();
                 }
             }
         }
     },
 
-    set_cursor_location: function(panel, x, y, w, h) {
-        this._candidate_panel.set_cursor_location(x, y, w, h);
+    setCursorLocation: function(panel, x, y, w, h) {
+        this._candidatePanel.setCursorLocation(x, y, w, h);
     },
 
-    update_preedit_text: function(panel, text, cursor_pos, visible) {
-        this._candidate_panel.update_preedit_text(text, cursor_pos, visible);
+    updatePreeditText: function(panel, text, cursorPos, visible) {
+        this._candidatePanel.updatePreeditText(text, cursorPos, visible);
     },
 
-    show_preedit_text: function(panel) {
-        this._candidate_panel.show_preedit_text();
+    showPreeditText: function(panel) {
+        this._candidatePanel.showPreeditText();
     },
 
-    hide_preedit_text: function(panel) {
-        this._candidate_panel.hide_preedit_text();
+    hidePreeditText: function(panel) {
+        this._candidatePanel.hidePreeditText();
     },
 
-    update_auxiliary_text: function(panel, text, visible) {
-        this._candidate_panel.update_auxiliary_text(text, visible);
+    updateAuxiliaryText: function(panel, text, visible) {
+        this._candidatePanel.updateAuxiliaryText(text, visible);
     },
 
-    show_auxiliary_text: function(panel) {
-        this._candidate_panel.show_auxiliary_text();
+    showAuxiliaryText: function(panel) {
+        this._candidatePanel.showAuxiliaryText();
     },
 
-    hide_auxiliary_text: function(panel) {
-        this._candidate_panel.hide_auxiliary_text();
+    hideAuxiliaryText: function(panel) {
+        this._candidatePanel.hideAuxiliaryText();
     },
 
-    update_lookup_table: function(panel, lookup_table, visible) {
-        this._candidate_panel.update_lookup_table(lookup_table, visible);
+    updateLookupTable: function(panel, lookupTable, visible) {
+        this._candidatePanel.updateLookupTable(lookupTable, visible);
     },
 
-    show_lookup_table: function(panel) {
-        this._candidate_panel.show_lookup_table();
+    showLookupTable: function(panel) {
+        this._candidatePanel.showLookupTable();
     },
 
-    hide_lookup_table: function(panel) {
-        this._candidate_panel.hide_lookup_table();
+    hideLookupTable: function(panel) {
+        this._candidatePanel.hideLookupTable();
     },
 
-    page_up_lookup_table: function(panel) {
-        this._candidate_panel.page_up_lookup_table();
+    pageUpLookupTable: function(panel) {
+        this._candidatePanel.pageUpLookupTable();
     },
 
-    page_down_lookup_table: function(panel) {
-        this._candidate_panel.page_down_lookup_table();
+    pageDownLookupTable: function(panel) {
+        this._candidatePanel.pageDownLookupTable();
     },
 
-    cursor_up_lookup_table: function(panel) {
-        this._candidate_panel.cursor_up_lookup_table();
+    cursorUpLookupTable: function(panel) {
+        this._candidatePanel.cursorUpLookupTable();
     },
 
-    cursor_down_lookup_table: function(panel) {
-        this._candidate_panel.cursor_down_lookup_table();
+    cursorDownLookupTable: function(panel) {
+        this._candidatePanel.cursorDownLookupTable();
     },
 
-    show_candidate_window: function(panel) {
-        this._candidate_panel.show_all();
+    showCandidateWindow: function(panel) {
+        this._candidatePanel.showAll();
     },
 
-    hide_candidate_window: function(panel) {
-        this._candidate_panel.hide_all();
+    hideCandidateWindow: function(panel) {
+        this._candidatePanel.hideAll();
     },
 
-    register_properties: function(panel, props) {
+    registerProperties: function(panel, props) {
         for (let i = 0; props.get(i) != null; i++) {
-            this._update_icon_with_property(props.get(i));
+            this._updateIconWithProperty(props.get(i));
         }
-        this._language_bar.register_properties(props);
+        this._languageBar.registerProperties(props);
     },
 
-    update_property: function(panel, prop) {
-        this._update_icon_with_property(prop);
-        this._language_bar.update_property(prop);
+    updateProperty: function(panel, prop) {
+        this._updateIconWithProperty(prop);
+        this._languageBar.updateProperty(prop);
     },
 
-    focus_in: function(panel, path) {
+    focusIn: function(panel, path) {
         this.reset();
-        this._focus_ic = IBus.InputContext.get_input_context(path,
-                                                             this._bus.get_connection());
-        let enabled = this._focus_ic.is_enabled();
-        this._language_bar.set_enabled(enabled);
-        if (this._active_engine != null) {
-            this._focus_ic.set_engine(this._active_engine.name);
-            this._active_engine = null;
+        this._focusIC = IBus.InputContext.get_input_context(path,
+                                                            this._bus.get_connection());
+        let enabled = this._focusIC.is_enabled();
+        this._languageBar.setEnabled(enabled);
+        if (this._activeEngine != null) {
+            this._focusIC.set_engine(this._activeEngine.name);
+            this._activeEngine = null;
         }
 
-        let use_bridge_hotkey = this._use_bridge_hotkey();
-        this._set_default_layout_engine(use_bridge_hotkey);
-        if (use_bridge_hotkey) {
-            if (this._xkb_group_id != this._xkblayout.get_group()) {
-                this._xkb_group_id = this._xkblayout.get_group();
-                this._disabled_engines_id = this._xkb_group_id;
+        let useBridgeHotkey = this._useBridgeHotkey();
+        this._setDefaultLayoutEngine(useBridgeHotkey);
+        if (useBridgeHotkey) {
+            if (this._xkbGroupID != this._xkblayout.getGroup()) {
+                this._xkbGroupID = this._xkblayout.getGroup();
+                this._disabledEnginesID = this._xkbGroupID;
             }
-            this._focus_in_bridge_hotkey(enabled, false);
+            this._focusInBridgeHotkey(enabled, false);
         } else {
-            this._focus_in_on_off_hotkey(enabled, false);
+            this._focusInOnOffHotkey(enabled, false);
         }
     },
 
-    focus_out: function(panel, path) {
+    focusOut: function(panel, path) {
         this.reset();
-        this._focus_ic = null;
-        this._language_bar.set_enabled(false);
+        this._focusIC = null;
+        this._languageBar.setEnabled(false);
 
-        if (this._use_bridge_hotkey()) {
-            this._focus_in_bridge_hotkey(false, false);
+        if (this._useBridgeHotkey()) {
+            this._focusInBridgeHotkey(false, false);
         } else {
-            this._focus_in_on_off_hotkey(false, false);
+            this._focusInOnOffHotkey(false, false);
         }
     },
 
-    state_changed: function(panel) {
-        if (this._focus_ic == null) {
+    stateChanged: function(panel) {
+        if (this._focusIC == null) {
             return;
         }
 
-        let enabled = this._focus_ic.is_enabled();
-        this._language_bar.set_enabled(enabled);
+        let enabled = this._focusIC.is_enabled();
+        this._languageBar.setEnabled(enabled);
 
-        if (this._use_bridge_hotkey()) {
-            this._focus_in_bridge_hotkey(enabled, true);
+        if (this._useBridgeHotkey()) {
+            this._focusInBridgeHotkey(enabled, true);
         } else {
-            this._focus_in_on_off_hotkey(enabled, true);
+            this._focusInOnOffHotkey(enabled, true);
         }
     },
 
-    is_restart: function() {
-        return this._is_restart;
+    isRestart: function() {
+        return this._isRestart;
     },
 
     restart: function(bus) {
-        this._init_bus(bus);
-        this._is_restart = false;
+        this._initBus(bus);
+        this._isRestart = false;
     },
 
     reset: function(ic) {
-        //this._candidate_panel.reset();
-        //this._language_bar.reset();
+        //this._candidatePanel.reset();
+        //this._languageBar.reset();
     },
 };

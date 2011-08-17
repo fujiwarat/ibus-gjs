@@ -21,23 +21,23 @@
 const Clutter = imports.gi.Clutter;
 const St = imports.gi.St;
 const Lang = imports.lang;
-const Button = imports.ui.panelMenu.Button;
+const PanelMenu = imports.ui.panelMenu;
 const Main = imports.ui.main;
 
-const PopupMenuNoOpenStateChanged = imports.ui.status.ibus.popupMenu.PopupMenuNoOpenStateChanged;
+const PopupMenu = imports.ui.status.ibus.popupMenu;
 
 
-function SystemStatusLabelButton() {
-    this._init.apply(this, arguments);
+function SystemStatusLabelButton(label, iconName, tooltipText) {
+    this._init(label, iconName, tooltipText);
 }
 
 /* We'd like to show both icon and label. */
 SystemStatusLabelButton.prototype = {
-    __proto__: Button.prototype,
+    __proto__: PanelMenu.Button.prototype,
 
     _init: function(label, iconName, tooltipText) {
-        Button.prototype._init.call(this, St.Align.START);
-        this._init_menu();
+        PanelMenu.Button.prototype._init.call(this, St.Align.START);
+        this._initMenu();
         this._iconActor = null;
         this._iconName = null;
         this._iconActor = null;
@@ -53,12 +53,14 @@ SystemStatusLabelButton.prototype = {
 
     /* The custom PopupMenu does not emit open-state-changed so that
      * the focus is kept on the text applications. */
-    _init_menu: function() {
+    _initMenu: function() {
         if (this.menu) {
             this.menu.close();
         }
-        this.menu = new PopupMenuNoOpenStateChanged(this.actor, St.Align.START,
-                                                    St.Side.TOP, 0);
+        this.menu = new PopupMenu.PopupMenuNoOpenStateChanged(this.actor,
+                                                              St.Align.START,
+                                                              St.Side.TOP,
+                                                              0);
         Main.chrome.addActor(this.menu.actor, { affectsStruts: false });
         this.menu.actor.hide();
     },

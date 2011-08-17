@@ -2,7 +2,6 @@
 # Please keep this file in alphabetical order.
 js/ui/status/ibus/candidatePanel.js
 js/ui/status/ibus/common.js
-js/ui/status/ibus/handle.js
 js/ui/status/ibus/indicator.js
 js/ui/status/ibus/languageBar.js
 js/ui/status/ibus/panel.js.in

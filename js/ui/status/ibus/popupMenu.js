@@ -20,8 +20,7 @@
 
 const St = imports.gi.St;
 const Signals = imports.signals;
-const PopupBaseMenuItem = imports.ui.popupMenu.PopupBaseMenuItem;
-const PopupMenu = imports.ui.popupMenu.PopupMenu;
+const PopupMenu = imports.ui.popupMenu;
 
 
 function PopupImageMenuItemMarkup(text, iconName) {
@@ -30,10 +29,10 @@ function PopupImageMenuItemMarkup(text, iconName) {
 
 /* We'd like to show the markup text likes bold type. */
 PopupImageMenuItemMarkup.prototype = {
-    __proto__: PopupBaseMenuItem.prototype,
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
     _init: function (text, iconName) {
-        PopupBaseMenuItem.prototype._init.call(this);
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this);
 
         this.label = new St.Label({ text: text });
         let clutter_text = this.label.get_clutter_text();
@@ -50,8 +49,8 @@ PopupImageMenuItemMarkup.prototype = {
     }
 };
 
-function PopupMenuNoOpenStateChanged() {
-    this._init.apply(this, arguments);
+function PopupMenuNoOpenStateChanged(sourceActor, alignment, arrowSide, gap) {
+    this._init(sourceActor, alignment, arrowSide, gap);
 }
 
 /* This class and PopupMenu.PopupMenu are almost same but this does not emit
@@ -60,10 +59,10 @@ function PopupMenuNoOpenStateChanged() {
  * Input method needs to keep the focus on the text application to get the
  * current GtkIMContext so the grab methods need to be avoided. */
 PopupMenuNoOpenStateChanged.prototype = {
-    __proto__: PopupMenu.prototype,
+    __proto__: PopupMenu.PopupMenu.prototype,
 
     _init: function(sourceActor, alignment, arrowSide, gap) {
-        PopupMenu.prototype._init.call(this, sourceActor, alignment, arrowSide, gap);
+        PopupMenu.PopupMenu.prototype._init.call(this, sourceActor, alignment, arrowSide, gap);
     },
 
     open: function(animate) {
