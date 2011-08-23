@@ -81,9 +81,7 @@ IBusPanel.prototype = {
         this._indicator.actor.connect('button-press-event',
                                       Lang.bind(this, this._onShellPanelButtonPressEvent));
 
-        // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
-        // config value now.
-        //this._configLoadLookupTableOrientation();
+        this._configLoadLookupTableOrientation();
     },
 
     _initBus: function(bus) {
@@ -124,6 +122,15 @@ IBusPanel.prototype = {
         } catch (e) {
             // This feature is not available.
         }
+        this._useBridgeHotkeyUser = true;
+        try {
+            this._useBridgeHotkeyUser = this._config.get_value(
+                'general/hotkey',
+                'use_bridge_hotkey',
+                GLib.Variant.new_boolean(true)).get_boolean();
+        } catch (e) {
+            // This feature is not available.
+        }
         this._defaultBridgeEngineName = XKBLayout.DEFAULT_BRIDGE_ENGINE_NAME;
         try {
             this._defaultBridgeEngineName = IBus.get_default_bridge_engine_name();
@@ -137,22 +144,17 @@ IBusPanel.prototype = {
         this._xkbGroupID = -1;
 
         this._xkblayout = new XKBLayout.XKBLayout(this._config);
-        /* Currently GLib.Variant is not implemented. bug #622344 */
-        let useXkb = true;
-        /*
-        let useXkb = this._config.get_value('general',
-                                            'use_system_keyboard_layout',
-                                            false);
-        */
+        let useXkb = this._config.get_value(
+            'general',
+            'use_system_keyboard_layout',
+            GLib.Variant.new_boolean(false)).get_boolean();
         if (!useXkb) {
             this._xkblayout.useXkb(useXkb);
         }
-        let value = 'default';
-        /*
-        let value = this._config.get_value('general',
-                                           'system_keyboard_layout',
-                                           '') + '';
-        */
+        let value = this._config.get_value(
+            'general',
+            'system_keyboard_layout',
+            GLib.Variant.new_string('')).dup_string()[0];
         if (value == '') {
             value = 'default';
         }
@@ -166,11 +168,10 @@ IBusPanel.prototype = {
             }
             this._xkblayout.setDefaultLayout(value);
         }
-        /*
-        value = this._config.get_value('general',
-                                       'system_keyboard_option',
-                                       '') + '';
-        */
+        value = this._config.get_value(
+            'general',
+            'system_keyboard_option',
+            GLib.Variant.new_string('')).dup_string()[0];
         if (value == '') {
             value = 'default';
         }
@@ -223,16 +224,7 @@ IBusPanel.prototype = {
         if (!this._useBridgeHotkeySystem) {
             return false;
         }
-        if (this._config == null) {
-            return true;
-        }
-        // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
-        // config value now.
-        /*
-        return this._config.get_value('general/hotkey', 'use_bridge_hotkey',
-                                      true);
-        */
-        return true;
+        return this._useBridgeHotkeyUser;
     },
 
     _configValueChangedCB: function(bus, section, name, value) {
@@ -240,17 +232,14 @@ IBusPanel.prototype = {
         if (section != 'panel') {
             return;
         }
-        // FIXME: Due to gjs not support Glib.Varient so far, we can't get the
-        // config value now.
-        /*
         if (name == 'lookup_table_orientation') {
             this._configLoadLookupTableOrientation();
         }
-        */
     },
 
     _configLoadLookupTableOrientation: function() {
-        let value = this._config.get_value('panel', 'lookup_table_orientation', 0);
+        let value = this._config.get_value('panel', 'lookup_table_orientation',
+                                           GLib.Variant.new_int32(0)).get_int32();
         let orientation = Common.ORIENTATION_VERTICAL;
         if (value in [Common.ORIENTATION_HORIZONTAL,
                       Common.ORIENTATION_VERTICAL])

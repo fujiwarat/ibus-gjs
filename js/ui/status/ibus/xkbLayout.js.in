@@ -99,14 +99,15 @@ XKBLayout.prototype = {
         this._timeLagSessionXkbTimer = 0;
         GLib.test_timer_start();
         this._xkbLatinLayouts = [];
-        /* Currently GLib.Variant is not implemented. bug #622344 */
-        /*
         if (this._config != null) {
-            this._xkbLatinLayouts = this._config.get_value('general',
-                                                           'xkb_latin_layouts',
-                                                           []);
+            let value = this._config.get_value('general',
+                                               'xkb_latin_layouts',
+                                               null);
+            for (let i = 0; value != null && i < value.n_children(); i++) {
+                this._xkbLatinLayouts.push(
+                    value.get_child_value(i).dup_string()[0]);
+            }
         }
-        */
     },
 
     /* _getModelFromLayout:
@@ -214,7 +215,6 @@ XKBLayout.prototype = {
         if (this._defaultLayout == null) {
             return;
         }
-        layout = layout + '';
         if (this._timeLagSessionXkbLayout == true) {
             this._defaultLayout = this.getLayout();
             this._defaultModel = this.getModel();
@@ -262,7 +262,7 @@ XKBLayout.prototype = {
         }
         let needUsLayout = false;
         for (let i = 0; i < this._xkbLatinLayouts.length; i ++) {
-            let latinLayout = this._xkbLatinLayouts[i] + '';
+            let latinLayout = this._xkbLatinLayouts[i];
             if (layout == latinLayout) {
                 needUsLayout = true;
                 break;
