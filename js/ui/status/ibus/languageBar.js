@@ -34,16 +34,7 @@ LanguageBar.prototype = {
         this._imName = null;
         this._props = null;
         this._indicator = indicator;
-
-        this._properties = [];
-    },
-
-    _removeProperties: function() {
-        // reset all properties
-        for (let i = 0; i < this._properties.length; i++) {
-            this._properties[i].destroy();
-        }
-        this._properties = [];
+        this._menuItems = [];
     },
 
     _replaceProperty: function(old_prop, new_prop) {
@@ -68,10 +59,6 @@ LanguageBar.prototype = {
         this._imName = text
     },
 
-    reset: function() {
-        this._removeProperties();
-    },
-
     setEnabled: function(enabled) {
         this._enabled = enabled;
     },
@@ -94,8 +81,8 @@ LanguageBar.prototype = {
                 }
             }
         }
-        for (let i = 0; i < this._properties.length; i++) {
-            this._properties[i].update_property(prop);
+        for (let i = 0; i < this._menuItems.length; i++) {
+            this._menuItems[i].updateProperty(prop);
         }
     },
 
@@ -109,7 +96,9 @@ LanguageBar.prototype = {
             return;
         }
 
-        this._removeProperties();
+        // Do not have to init this._menuItems here because panel always
+        // calls _indicator.menu.removeAll.
+
         let item = null;
         let prop = null;
         let radioGroup = [];
@@ -151,8 +140,7 @@ LanguageBar.prototype = {
                 item.hide();
             }
 
-            //this._properties.push(item);
-            //menu.insert(item.getRaw(), 0);
+            this._menuItems.push(item);
             this._indicator.menu.addMenuItem(item.getRaw());
             item.connect('property-activate',
                          Lang.bind(this, this._onItemPropertyActivate));
@@ -161,7 +149,7 @@ LanguageBar.prototype = {
         if (props.get(0) != null) {
             this._indicator.menu.addMenuItem(new ShellMenu.SeparatorShellMenuItem().getRaw());
         }
-    },
+    }
 };
 
 Signals.addSignalMethods(LanguageBar.prototype);

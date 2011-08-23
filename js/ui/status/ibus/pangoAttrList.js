@@ -113,5 +113,5 @@ PangoAttrList.prototype = {
 
     getRaw: function() {
         return this._attrs;
-    },
+    }
 };

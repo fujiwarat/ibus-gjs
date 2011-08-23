@@ -25,26 +25,8 @@ const Lang = imports.lang;
 const Signals = imports.signals;
 
 const PanelMenu = imports.ui.status.ibus.panelMenu;
-const Panel = imports.ui.status.ibus.panel;
+const IBusPanel = imports.ui.status.ibus.ibusPanel;
 
-
-const UIApplicationIface = {
-    name: IBus.SERVICE_PANEL,
-    methods: [],
-    signals: [{ name: 'NameOwnerChanged',
-                inSignature: 'sss',
-                outSignature: ''
-              },
-              { name: 'NameLost',
-                inSignature: 's',
-                outSignature: ''
-              },
-              { name: 'NameAcquired',
-                inSignature: 's',
-                outSignature: ''
-              }],
-    properties: []
-};
 
 function UIApplication(indicator) {
     this._init(indicator);
@@ -95,7 +77,7 @@ UIApplication.prototype = {
         if (isRestart) {
             this._panel.restart(this._bus);
         } else {
-            this._panel = new Panel.Panel(this._bus, this._indicator);
+            this._panel = new IBusPanel.IBusPanel(this._bus, this._indicator);
         }
 
         this._bus.get_connection().signal_subscribe('org.freedesktop.DBus',
@@ -164,12 +146,10 @@ UIApplication.prototype = {
             return;
         }
         this._connectCB();
-    },
-
+    }
 };
 
 Signals.addSignalMethods(UIApplication.prototype);
-DBus.conformExport(UIApplication.prototype, UIApplicationIface);
 
 function Indicator() {
     this._init();
@@ -222,5 +202,5 @@ Indicator.prototype = {
 
     _nameLostCB: function() {
         log('Got NameLost signal from DBus');
-    },
+    }
 };

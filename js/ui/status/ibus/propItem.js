@@ -22,6 +22,8 @@ function PropItem(prop) {
     this._init(prop);
 }
 
+/* This class provides _prop attribute and updateProperty function
+ * for shellMenu.ShellMenu. */
 PropItem.prototype = {
     _init: function(prop) {
         this._prop = prop;
@@ -70,5 +72,5 @@ PropItem.prototype = {
     },
 
     propertyChanged: function() {
-    },
+    }
 };

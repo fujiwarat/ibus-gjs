@@ -28,7 +28,6 @@ const Signals = imports.signals;
 const Main = imports.ui.main;
 const Shell = imports.gi.Shell;
 
-const PangoAttrList = imports.ui.status.ibus.pangoAttrList;
 const Common = imports.ui.status.ibus.common;
 
 function StCandidateArea(orientation) {
@@ -160,6 +159,10 @@ StCandidateArea.prototype = {
         }
 
         for (let i = 0; i < candidates.length; i++) {
+            /* Use a ClutterActor attribute of Shell's theme instead of
+             * Pango.AttrList for the lookup window GUI and 
+             * can ignore 'attrs' simply from IBus engines?
+             */
             let [text, attrs] = candidates[i];
             if (i == focusCandidate && showCursor) {
                 this._labels[i][1].add_style_pseudo_class('active');
@@ -239,13 +242,13 @@ CandidatePanel.prototype = {
 
         // TODO: page up/down GUI
 
-        this._pack_all_st_widgets();
+        this._packAllStWidgets();
         Main.chrome.addActor(this._stCandidatePanel,
                              { affectsStruts: false });
         this._checkShowStates();
     },
 
-    _pack_all_st_widgets: function() {
+    _packAllStWidgets: function() {
         this._stCandidatePanel.add(this._stPreeditLabel,
                                    {x_fill: true,
                                     y_fill: false,
@@ -277,9 +280,9 @@ CandidatePanel.prototype = {
 
     updatePreeditText: function(text, cursor_pos, visible) {
         if (visible) {
-            this.show_preedit_text();
+            this.showPreeditText();
         } else {
-            this.hide_preedit_text();
+            this.hidePreeditText();
         }
         this._preedit_stribg = text.get_text();
         this._stPreeditLabel.set_text(text.get_text());
@@ -311,9 +314,7 @@ CandidatePanel.prototype = {
         let newLabels = [];
         for (let i = 0; this._lookupTable.get_label(i) != null; i++) {
             let label = this._lookupTable.get_label(i);
-            newLabels.push([label.get_text(),
-                            new PangoAttrList.PangoAttrList(
-                                label.get_attributes(), label.get_text()).getRaw()]);
+            newLabels.push([label.get_text(), label.get_attributes()]);
         }
         this._stCandidateArea.setLabels(newLabels);
     },
@@ -346,8 +347,7 @@ CandidatePanel.prototype = {
         for (let i = 0; i < candidates.length; i++) {
             let candidate = candidates[i];
             newCandidates.push([candidate.get_text(),
-                                new PangoAttrList.PangoAttrList(
-                                    candidate.get_attributes(), candidate.get_text()).getRaw()]);
+                                candidate.get_attributes()]);
         }
         this._stCandidateArea.setCandidates(newCandidates,
                                             this._getCursorPosInCurrentPage(),
@@ -410,7 +410,7 @@ CandidatePanel.prototype = {
 
     setCursorLocation: function(x, y, w, h) {
         // if cursor location is changed, we reset the moved cursor location
-        if (this._cursorLocation != [x, y, w, h]) {
+        if (this._cursorLocation.join() != [x, y, w, h].join()) {
             this._cursorLocation = [x, y, w, h];
             this._movedCursorLocation = null;
             this._checkPosition();
@@ -433,12 +433,10 @@ CandidatePanel.prototype = {
     reset: function() {
         let text = IBus.Text.new_from_string('');
         this.updatePreeditText(text, 0, false);
-        text.unref();
         text = IBus.Text.new_from_string('');
         this.updateAuxiliaryText(text, false);
-        text.unref();
         this.updateLookupTable(null, false);
-        this.hide();
+        this.hideAll();
     },
 
     setCurrentOrientation: function(orientation) {
@@ -502,7 +500,7 @@ CandidatePanel.prototype = {
 
     move: function(x, y) {
         this._stCandidatePanel.set_position(x, y);
-    },
+    }
 };
 
 Signals.addSignalMethods(CandidatePanel.prototype);

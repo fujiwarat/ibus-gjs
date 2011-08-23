@@ -32,6 +32,16 @@ function ShellMenu(prop) {
     this._init(prop);
 }
 
+/**
+ * ShellMenu:
+ * @prop: IBus.Property
+ *
+ * This class can be used to display the sub menu in the active menu
+ * on the shell status icon as panelMenu.SystemStatusLabelButton.menu
+ * and also creates ths sub menu items in the menu.
+ * This class also forwards the signal of 'property-activate' from
+ * the sub menu items.
+ */
 ShellMenu.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
@@ -101,28 +111,7 @@ ShellMenu.prototype = {
     },
 
     addMenuItem: function(menuItem) {
-        this._box.add(menuItem.actor);
-        menuItem._activeChangeId = menuItem.connect('active-changed', Lang.bind(this, function (menuItem, active) {
-            if (active && this._activeMenuItem != menuItem) {
-                if (this._activeMenuItem)
-                    this._activeMenuItem.setActive(false);
-                this._activeMenuItem = menuItem;
-                this.emit('active-changed', menuItem);
-            } else if (!active && this._activeMenuItem == menuItem) {
-                this._activeMenuItem = null;
-                this.emit('active-changed', null);
-            }
-        }));
-        menuItem._activateId = menuItem.connect('activate', Lang.bind(this, function (menuItem, event) {
-            this.emit('activate', menuItem);
-            this.close();
-        }));
-        menuItem.connect('destroy', Lang.bind(this, function(emitter) {
-            menuItem.disconnect(menuItem._activateId);
-            menuItem.disconnect(menuItem._activeChangeId);
-            if (menuItem == this._activeMenuItem)
-                this._activeMenuItem = null;
-        }));
+        this._menu.addMenuItem(menuItem);
     },
 
     getRaw: function() {
@@ -133,11 +122,15 @@ ShellMenu.prototype = {
         this._menu.actor.show();
     },
 
+    destroy: function() {
+        this._menu.destroy();
+    },
+
     setSensitive: function(sensitive) {
         Common.actorSetSensitive(this._menu.actor,
                                  sensitive,
                                  this._menu.label);
-    },
+    }
 };
 
 Signals.addSignalMethods(ShellMenu.prototype);
@@ -146,6 +139,13 @@ function ImageShellMenuItem(prop) {
     this._init(prop);
 }
 
+/**
+ * ImageShellMenuItem:
+ * @prop: IBus.Property
+ *
+ * This class creates popupMenu.PopupImageMenuItem from @prop and
+ * also emits the signal of 'property-activate' when it's activated.
+ */
 ImageShellMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
@@ -153,7 +153,8 @@ ImageShellMenuItem.prototype = {
         PropItem.PropItem.prototype._init.call(this, prop);
         this._item = new PopupMenu.PopupImageMenuItem(this._prop.get_label().get_text(),
                                                       this._prop.get_icon());
-        this._item.connect('activate', Lang.bind(this, this._onActivate));
+        this._activateId = this._item.connect('activate',
+                                              Lang.bind(this, this._onActivate));
 
         if (this._prop.get_visible()) {
             this._item.actor.show();
@@ -190,6 +191,7 @@ ImageShellMenuItem.prototype = {
     },
 
     destroy: function() {
+        this.disconnect(this._activateId);
         this._item.destroy();
     },
 
@@ -211,7 +213,7 @@ ImageShellMenuItem.prototype = {
 
     setLabel: function(label) {
         this._item.label.set_text(label);
-    },
+    }
 };
 
 Signals.addSignalMethods(ImageShellMenuItem.prototype);
@@ -220,6 +222,13 @@ function CheckShellMenuItem(prop) {
     this._init(prop);
 }
 
+/**
+ * CheckShellMenuItem:
+ * @prop: IBus.Property
+ *
+ * This class creates popupMenu.PopupSwitchMenuItem from @prop and
+ * also emits the signal of 'property-activate' when it's activated.
+ */
 CheckShellMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
@@ -228,7 +237,8 @@ CheckShellMenuItem.prototype = {
         this._item = new PopupMenu.PopupSwitchMenuItem(this._prop.get_label().get_text(),
                                                        this._prop.get_state() == IBus.PropState.CHECKED);
 
-        this._item.connect('activate', Lang.bind(this, this._onActivate));
+        this._activateId = this._item.connect('activate',
+                                              Lang.bind(this, this._onActivate));
 
         if (this._prop.get_visible()) {
             this._item.actor.show();
@@ -259,7 +269,7 @@ CheckShellMenuItem.prototype = {
 
     propertyChanged: function() {
         this._item.setToggleState(this._prop.get_state() == IBus.PropState.CHECKED);
-        this._item.setSensitive(this._prop.sensitive);
+        this.setSensitive(this._prop.get_sensitive());
         if (this._prop.get_visible()) {
             this._item.actor.show();
         } else {
@@ -280,6 +290,7 @@ CheckShellMenuItem.prototype = {
     },
 
     destroy: function() {
+        this.disconnect(this._activateId);
         this._item.destroy();
     },
 
@@ -301,7 +312,7 @@ CheckShellMenuItem.prototype = {
 
     setLabel: function(label) {
         this._item.label.set_text(label);
-    },
+    }
 };
 
 Signals.addSignalMethods(CheckShellMenuItem.prototype);
@@ -310,6 +321,14 @@ function RadioShellMenuItem(group, prop) {
     this._init(group, prop);
 }
 
+/**
+ * RadioShellMenuItem:
+ * @prop: IBus.Property
+ *
+ * This class creates popupMenu.PopupMenuItem from @prop and
+ * handles a dot image as a radio button likes gtk.RadioMenuItem.
+ * It also emits the signal of 'property-activate' when it's activated.
+ */
 RadioShellMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
@@ -320,7 +339,8 @@ RadioShellMenuItem.prototype = {
         this._item = new PopupMenu.PopupMenuItem(this._prop.get_label().get_text());
         this._item.state = (this._prop.get_state() == IBus.PropState.CHECKED);
         this._item.setShowDot(this._item.state);
-        this._item.connect('activate', Lang.bind(this, this._onActivate));
+        this._activateId = this._item.connect('activate',
+                                              Lang.bind(this, this._onActivate));
 
         if (prop.get_visible()) {
             this._item.actor.show();
@@ -349,8 +369,7 @@ RadioShellMenuItem.prototype = {
     },
 
     propertyChanged: function() {
-        this._item.setToggleState(this._prop.get_state() == IBus.PropState.CHECKED);
-        this._item.setSensitive(this._prop.get_sensitive());
+        this.setSensitive(this._prop.get_sensitive());
         if (this._prop.get_visible()) {
             this._item.actor.show();
         } else {
@@ -371,6 +390,7 @@ RadioShellMenuItem.prototype = {
     },
 
     destroy: function() {
+        this.disconnect(this._activateId);
         this._item.destroy();
     },
 
@@ -415,7 +435,7 @@ RadioShellMenuItem.prototype = {
         if (do_emit) {
             this.emit('property-activate', this._prop.get_key(), this._prop.get_state());
         }
-    },
+    }
 };
 
 Signals.addSignalMethods(RadioShellMenuItem.prototype);
@@ -424,6 +444,11 @@ function SeparatorShellMenuItem() {
     this._init();
 }
 
+/**
+ * SeparatorShellMenuItem:
+ *
+ * This class creates popupMenu.PopupSeparatorMenuItem.
+ */
 SeparatorShellMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
@@ -442,7 +467,7 @@ SeparatorShellMenuItem.prototype = {
 
     destroy: function() {
         this._item.destroy();
-    },
+    }
 };
 
 

@@ -20,7 +20,6 @@
 
 const GLib = imports.gi.GLib;
 const IBus = imports.gi.IBus;
-const Main = imports.ui.main;
 
 const Config = imports.misc.config;
 const Util = imports.misc.util;
@@ -56,10 +55,11 @@ function _trySpawnWithPipes(argv) {
 
 function _handleSpawnError(command, err) {
     let title = _("Execution of '%s' failed:").format(command);
-    Main.notifyError(title, err.message);
+    log(title);
+    log(err.message);
 }
 
-function _spawn_with_pipes(argv) {
+function _spawnWithPipes(argv) {
     try {
         return _trySpawnWithPipes(argv);
     } catch (err) {
@@ -73,7 +73,7 @@ function XKBLayout(config, command) {
 }
 
 XKBLayout.prototype = {
-    _init: function(config, command) {
+    _init: function(config) {
         this._config = null;
         this._command = Config.IBUS_XKB;
         this._useXkb = Config.HAVE_IBUS_XKB;
@@ -81,15 +81,19 @@ XKBLayout.prototype = {
         if (config != undefined) {
             this._config = config;
         }
-        if (command != undefined) {
-            this._command = command;
-        }
         if (this._command == null) {
             this._useXkb = false;
         }
         this._defaultLayout = this.getLayout();
         this._defaultModel = this.getModel();
         this._defaultOption = this.getOption();
+        /* If setDefaultLayout() is default, the default layout is
+         * pulled from the current XKB. But it's possible gnome-settings-daemon
+         * does not run yet. I added XKB_SESSION_TIME_OUT for the timer.
+         * The _timeLagSessionXkbTimer will be compared with
+         * XKB_SESSION_TIME_OUT.
+         * Maybe it would be good that IBusPanel is able to create
+         * IBus.Engines from gsettings of org.gnome.libgnomekbd.keyboard */
         this._timeLagSessionXkbLayout = true;
         this._timeLagSessionXkbOption = true;
         this._timeLagSessionXkbTimer = 0;
@@ -105,6 +109,13 @@ XKBLayout.prototype = {
         */
     },
 
+    /* _getModelFromLayout:
+     * @layout: The format is 'layouts(models)[options]'
+     * @returns: ['layouts[options]', 'models']
+     *
+     * Return the array of layouts and models from the formatted string.
+     * Each element can be the comma separated values.
+     */
     _getModelFromLayout: function(layout) {
         let leftBracket = layout.indexOf('(');
         let rightBracket = layout.indexOf(')');
@@ -115,6 +126,13 @@ XKBLayout.prototype = {
         return [layout, 'default'];
     },
 
+    /* _getOptionFromLayout:
+     * @layout: The format is 'layouts[options]'
+     * @returns: ['layouts', 'options']
+     *
+     * Return the array of layouts and options from the formatted string.
+     * Each element can be the comma separated values.
+     */
     _getOptionFromLayout: function(layout) {
         let leftBracket = layout.indexOf('[');
         let rightBracket = layout.indexOf(']');
@@ -129,7 +147,7 @@ XKBLayout.prototype = {
         let retval = null;
         let basename = GLib.path_get_basename(this._command);
         let argv = [this._command, basename, arg];
-        let [result, output, std_err, status] = _spawn_with_pipes(argv);
+        let [result, output, std_err, status] = _spawnWithPipes(argv);
         if (!result) {
             return null;
         }
@@ -179,21 +197,15 @@ XKBLayout.prototype = {
         return this._getOutputFromCmdline('--get-group', 'group: ');
     },
 
-    setLayout: function(layout, model, option) {
+    setLayout: function(layout) {
+        let model = 'default';
+        let option = 'default';
+
         if (!this._useXkb) {
             return;
         }
         if (layout == undefined) {
             layout = 'default';
-        }
-        if (model == undefined) {
-            model = 'default';
-        }
-        if (option == undefined) {
-            option = 'default';
-        }
-        if (layout == null) {
-            return;
         }
         if (this._defaultLayout == null) {
             // Maybe opening display was failed in constructor.
@@ -203,9 +215,6 @@ XKBLayout.prototype = {
             return;
         }
         layout = layout + '';
-        // if setDefaultLayout() is not default, the default layout is
-        // pulled from the current XKB. But it's possible gnome-settings-daemon
-        // does not run yet. I added XKB_SESSION_TIME_OUT for the timer.
         if (this._timeLagSessionXkbLayout == true) {
             this._defaultLayout = this.getLayout();
             this._defaultModel = this.getModel();
@@ -227,43 +236,33 @@ XKBLayout.prototype = {
         } else {
             this._timeLagSessionXkbLayout = false;
         }
-        if (model != null) {
-            model = model + '';
-            if (model == 'default') {
-                [layout, model] = this._getModelFromLayout(layout);
-            }
-            if (model == 'default') {
-                if (isDefaultLayout) {
-                    model = this._defaultModel;
-                } else {
-                    model = null;
-                }
+        [layout, model] = this._getModelFromLayout(layout);
+        if (model == 'default') {
+            if (isDefaultLayout) {
+                model = this._defaultModel;
             } else {
-                this._timeLagSessionXkbLayout = false;
+                model = null;
             }
+        } else {
+            this._timeLagSessionXkbLayout = false;
         }
-        if (option != null) {
-            option = option + '';
-            if (option == 'default') {
-                let engineOption = 'default';
-                [layout, engineOption] = this._getOptionFromLayout(layout);
-                if (engineOption != null && engineOption != 'default') {
-                    option = this._defaultOption;
-                    if (option == null) {
-                        option = engineOption;
-                    } else {
-                        option = option + ',' + engineOption;
-                    }
-                    this._timeLagSessionXkbOption = false;
-                }
+        let engineOption = 'default';
+        [layout, engineOption] = this._getOptionFromLayout(layout);
+        if (engineOption != null && engineOption != 'default') {
+            option = this._defaultOption;
+            if (option == null) {
+                    option = engineOption;
+            } else {
+                    option = option + ',' + engineOption;
             }
-            if (option == 'default') {
-                option = this._defaultOption;
-            }
+            this._timeLagSessionXkbOption = false;
+        }
+        if (option == 'default') {
+            option = this._defaultOption;
         }
         let needUsLayout = false;
-        for (let latinLayout in this._xkbLatinLayouts) {
-            latinLayout = latinLayout + '';
+        for (let i = 0; i < this._xkbLatinLayouts.length; i ++) {
+            let latinLayout = this._xkbLatinLayouts[i] + '';
             if (layout == latinLayout) {
                 needUsLayout = true;
                 break;
@@ -304,7 +303,7 @@ XKBLayout.prototype = {
         return [this._defaultLayout, this._defaultModel];
     },
 
-    getDeefaultOption: function() {
+    getDefaultOption: function() {
         return this._defaultOption;
     },
 
@@ -317,14 +316,6 @@ XKBLayout.prototype = {
         }
         if (model == undefined) {
             model = 'default';
-        }
-        if (layout == null) {
-            log('ibus.xkblayout: None layout');
-            return;
-        }
-        if (model == null) {
-            log('ibus.xkblayout: None model');
-            return;
         }
         if (layout == 'default') {
             this._defaultLayout = this.getLayout();
@@ -350,10 +341,6 @@ XKBLayout.prototype = {
         if (option == undefined) {
             option = 'default';
         }
-        if (option == null) {
-            log('ibus.xkblayout: None option');
-            return;
-        }
         if (option == 'default') {
             this._defaultOption = this.getOption();
         } else {
@@ -369,7 +356,7 @@ XKBLayout.prototype = {
         this._defaultLayout = this.getLayout();
         this._defaultModel = this.getModel();
         this._defaultOption = this.getOption();
-    },
+    }
 };
 
 function engineDescNew(lang, layout, layoutDesc,
@@ -380,18 +367,6 @@ function engineDescNew(lang, layout, layoutDesc,
     let engineLayout = null;
     let engine = null;
 
-    if (layoutDesc == undefined) {
-        layoutDesc = null;
-    }
-    if (variant == undefined) {
-        variant = null;
-    }
-    if (variantDesc == undefined) {
-        variantDesc = null;
-    }
-    if (name == undefined) {
-        name = null;
-    }
     if (variantDesc != null) {
         longname = variantDesc;
     } else if (layout != null && variant != null) {

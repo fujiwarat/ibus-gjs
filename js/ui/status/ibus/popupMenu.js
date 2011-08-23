@@ -76,7 +76,6 @@ PopupMenuNoOpenStateChanged.prototype = {
 
         /* This does not emit open-state-changed to keep the focus on
          * text applications. */
-        //this.emit('open-state-changed', true);
     },
 
     close: function(animate) {
@@ -92,6 +91,5 @@ PopupMenuNoOpenStateChanged.prototype = {
 
         /* This does not emit open-state-changed to keep the focus on
          * text applications. */
-        //this.emit('open-state-changed', false);
-    },
+    }
 };

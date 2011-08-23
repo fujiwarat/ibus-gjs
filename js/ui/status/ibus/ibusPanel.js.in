@@ -31,7 +31,6 @@ const Config = imports.misc.config;
 
 const CandidatePanel = imports.ui.status.ibus.candidatePanel;
 const LanguageBar = imports.ui.status.ibus.languageBar;
-const PanelBase = imports.ui.status.ibus.panelBase;
 const IPopupMenu = imports.ui.status.ibus.popupMenu;
 const XKBLayout = imports.ui.status.ibus.xkbLayout;
 const Common = imports.ui.status.ibus.common;
@@ -39,19 +38,16 @@ const Common = imports.ui.status.ibus.common;
 const ICON_ENGINE = 'ibus-engine';
 
 
-function Panel(bus, indicator) {
+function IBusPanel(bus, indicator) {
     this._init(bus, indicator);
 }
 
-Panel.prototype = {
-    __proto__ : PanelBase.PanelBase.prototype,
-
+IBusPanel.prototype = {
     _init: function(bus, indicator) {
         this._indicator = indicator;
         this._setupPid = -1;
         let prefix = Config.IBUS_PREFIX;
         let dataDir = Config.IBUS_PKGDATADIR;
-        // this._iconsDir = dataDir + '/icons';
         this._setupCmd = prefix + '/bin/ibus-setup';
         this._isRestart = false;
         this._activeEngine = null;
@@ -102,7 +98,7 @@ Panel.prototype = {
             return false;
         }
 
-        PanelBase.PanelBase.prototype._init.call(this, bus);
+        this._initSignals();
 
         this._config.connect('value-changed',
                              Lang.bind(this, this._configValueChangedCB));
@@ -183,6 +179,44 @@ Panel.prototype = {
         }
 
         return true;
+    },
+
+    _initSignals: function() {
+        this._panel = IBus.PanelService.new(this._bus.get_connection());
+        this._panel.connect('set-cursor-location',
+                            Lang.bind(this, this.setCursorLocation));
+        this._panel.connect('update-preedit-text',
+                            Lang.bind(this, this.updatePreeditText));
+        this._panel.connect('show-preedit-text',
+                            Lang.bind(this, this.showPreeditText));
+        this._panel.connect('hide-preedit-text',
+                            Lang.bind(this, this.hidePreeditText));
+        this._panel.connect('update-auxiliary-text',
+                            Lang.bind(this, this.updateAuxiliaryText));
+        this._panel.connect('show-auxiliary-text',
+                            Lang.bind(this, this.showAuxiliaryText));
+        this._panel.connect('hide-auxiliary-text',
+                            Lang.bind(this, this.hideAuxiliaryText));
+        this._panel.connect('update-lookup-table',
+                            Lang.bind(this, this.updateLookupTable));
+        this._panel.connect('show-lookup-table',
+                            Lang.bind(this, this.showLookupTable));
+        this._panel.connect('hide-lookup-table',
+                            Lang.bind(this, this.hideLookupTable));
+        this._panel.connect('page-up-lookup-table',
+                            Lang.bind(this, this.pageUpLookupTable));
+        this._panel.connect('cursor-up-lookup-table',
+                            Lang.bind(this, this.cursorUpLookupTable));
+        this._panel.connect('cursor-down-lookup-table',
+                            Lang.bind(this, this.cursorDownLookupTable));
+        this._panel.connect('focus-in', Lang.bind(this, this.focusIn));
+        this._panel.connect('focus-out', Lang.bind(this, this.focusOut));
+        this._panel.connect('register-properties',
+                            Lang.bind(this, this.registerProperties));
+        this._panel.connect('update-property',
+                            Lang.bind(this, this.updateProperty));
+        this._panel.connect('state-changed',
+                            Lang.bind(this, this.stateChanged));
     },
 
     _useBridgeHotkey: function() {
@@ -930,6 +964,44 @@ Panel.prototype = {
         }
     },
 
+    reset: function(ic) {
+        this._candidatePanel.reset();
+    },
+
+    pageUp: function() {
+        this._panel.page_up();
+    },
+
+    pageDown: function() {
+        this._panel.page_down();
+    },
+
+    cursorUp: function() {
+        this._panel.cursor_up();
+    },
+
+    cursorDown: function() {
+        this._panel.cursor_down();
+    },
+
+    candidateClicked: function(index, button, state) {
+        this._panel.candidate_clicked(index, button, state);
+    },
+
+    propertyActivate: function(propName, prop_state) {
+        this._panel.property_activate(propName, prop_state);
+    },
+
+    propertyShow: function(propName) {
+        propName = new DBus.String(propName);
+        this._panel.property_show(propName);
+    },
+
+    propertyHide: function(prop_name) {
+        propName = new DBus.String(propName);
+        this._panel.property_hide(propName);
+    },
+
     isRestart: function() {
         return this._isRestart;
     },
@@ -937,10 +1009,5 @@ Panel.prototype = {
     restart: function(bus) {
         this._initBus(bus);
         this._isRestart = false;
-    },
-
-    reset: function(ic) {
-        //this._candidatePanel.reset();
-        //this._languageBar.reset();
-    },
+    }
 };

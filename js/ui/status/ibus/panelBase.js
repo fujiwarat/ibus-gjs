@@ -178,5 +178,5 @@ PanelBase.prototype = {
 
     setBus: function(bus) {
         this._init(bus);
-    },
+    }
 };

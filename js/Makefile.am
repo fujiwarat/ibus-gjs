@@ -25,12 +25,10 @@ jsdir = $(datadir)/gnome-shell/js
 nobase_dist_js_DATA = 	\
 	ui/status/ibus/candidatePanel.js	\
 	ui/status/ibus/common.js	\
+	ui/status/ibus/ibusPanel.js	\
 	ui/status/ibus/indicator.js	\
 	ui/status/ibus/languageBar.js	\
-	ui/status/ibus/panel.js		\
-	ui/status/ibus/panelBase.js	\
 	ui/status/ibus/panelMenu.js	\
-	ui/status/ibus/pangoAttrList.js	\
 	ui/status/ibus/popupMenu.js	\
 	ui/status/ibus/propItem.js	\
 	ui/status/ibus/shellMenu.js	\
@@ -46,7 +44,7 @@ ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
 	    cp $< $@; \
 	fi;
 
-ui/status/ibus/panel.js: ui/status/ibus/panel.js.in
+ui/status/ibus/ibusPanel.js: ui/status/ibus/ibusPanel.js.in
 	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
 	    sed -e "s|Config.IBUS_PREFIX|'$(IBUS_PREFIX)'|g" \
 	        -e "s|Config.IBUS_PKGDATADIR|'$(IBUS_PKGDATADIR)'|g" \
@@ -57,11 +55,11 @@ ui/status/ibus/panel.js: ui/status/ibus/panel.js.in
 
 EXTRA_DIST = \
 	misc/config.js.in		\
-	ui/status/ibus/panel.js.in	\
+	ui/status/ibus/ibusPanel.js.in	\
 	ui/status/ibus/xkbLayout.js.in	\
 	$(NULL)
 
 CLEANFILES = \
-	ui/status/ibus/panel.js		\
+	ui/status/ibus/ibusPanel.js		\
 	ui/status/ibus/xkbLayout.js	\
 	$(NULL)
