@@ -20,8 +20,8 @@
  */
 
 const St = imports.gi.St;
-const Gtk = imports.gi.Gtk;
 const Gdk = imports.gi.Gdk;
+const GLib = imports.gi.GLib;
 const IBus = imports.gi.IBus;
 const Lang = imports.lang;
 const Signals = imports.signals;
@@ -278,14 +278,50 @@ CandidatePanel.prototype = {
         this._checkShowStates();
     },
 
-    updatePreeditText: function(text, cursor_pos, visible) {
+    updatePreeditText: function(text, cursorPos, visible) {
         if (visible) {
             this.showPreeditText();
         } else {
             this.hidePreeditText();
         }
-        this._preedit_stribg = text.get_text();
-        this._stPreeditLabel.set_text(text.get_text());
+        let str = text.get_text();
+        this._stPreeditLabel.set_text(str);
+
+        let attrs = text.get_attributes();
+        for (let i = 0; attrs != null && attrs.get(i) != null; i++) {
+            let attr = attrs.get(i);
+            if (attr.get_attr_type() == IBus.AttrType.BACKGROUND) {
+                let startIndex = attr.get_start_index();
+                let endIndex = attr.get_end_index();
+                let len = GLib.utf8_strlen(str, -1);
+                let markup = '';
+                if (startIndex == 0 &&
+                    endIndex == GLib.utf8_strlen(str, -1)) {
+                    markup = markup.concat(str);
+                } else {
+                    if (startIndex > 0) {
+                        markup = markup.concat(GLib.utf8_substring(str,
+                                                                   0,
+                                                                   startIndex));
+                    }
+                    if (startIndex != endIndex) {
+                        markup = markup.concat('<span background=\"#555555\">');
+                        markup = markup.concat(GLib.utf8_substring(str,
+                                                                   startIndex,
+                                                                   endIndex));
+                        markup = markup.concat('</span>');
+                    }
+                    if (endIndex < len) {
+                        markup = markup.concat(GLib.utf8_substring(str,
+                                                                   endIndex,
+                                                                   len));
+                    }
+                }
+                let clutter_text = this._stPreeditLabel.get_clutter_text();
+                clutter_text.set_markup(markup);
+                clutter_text.queue_redraw();
+            }
+        }
     },
 
     showAuxiliaryText: function() {
