@@ -243,8 +243,7 @@ CandidatePanel.prototype = {
         // TODO: page up/down GUI
 
         this._packAllStWidgets();
-        Main.chrome.addActor(this._stCandidatePanel,
-                             { affectsStruts: false });
+        Main.uiGroup.add_actor(this._stCandidatePanel);
         this._checkShowStates();
     },
 

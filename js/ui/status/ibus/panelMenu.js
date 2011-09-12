@@ -36,7 +36,7 @@ SystemStatusLabelButton.prototype = {
     __proto__: PanelMenu.Button.prototype,
 
     _init: function(label, iconName, tooltipText) {
-        PanelMenu.Button.prototype._init.call(this, St.Align.START);
+        PanelMenu.Button.prototype._init.call(this, 0.0);
         this._initMenu();
         this._iconActor = null;
         this._iconName = null;
@@ -59,9 +59,9 @@ SystemStatusLabelButton.prototype = {
         }
         this.menu = new PopupMenu.PopupMenuNoOpenStateChanged(this.actor,
                                                               St.Align.START,
-                                                              St.Side.TOP,
-                                                              0);
-        Main.chrome.addActor(this.menu.actor, { affectsStruts: false });
+                                                              St.Side.TOP);
+        this.menu.actor.add_style_class_name('panel-menu');
+        Main.uiGroup.add_actor(this.menu.actor);
         this.menu.actor.hide();
     },
 

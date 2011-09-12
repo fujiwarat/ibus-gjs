@@ -61,8 +61,8 @@ function PopupMenuNoOpenStateChanged(sourceActor, alignment, arrowSide, gap) {
 PopupMenuNoOpenStateChanged.prototype = {
     __proto__: PopupMenu.PopupMenu.prototype,
 
-    _init: function(sourceActor, alignment, arrowSide, gap) {
-        PopupMenu.PopupMenu.prototype._init.call(this, sourceActor, alignment, arrowSide, gap);
+    _init: function(sourceActor, alignment, arrowSide) {
+        PopupMenu.PopupMenu.prototype._init.call(this, sourceActor, alignment, arrowSide);
     },
 
     open: function(animate) {
@@ -71,11 +71,14 @@ PopupMenuNoOpenStateChanged.prototype = {
 
         this.isOpen = true;
 
-        this._boxPointer.setPosition(this.sourceActor, this._gap, this._alignment);
+        this._boxPointer.setPosition(this.sourceActor, this._alignment);
         this._boxPointer.show(animate);
+
+        this.actor.raise_top();
 
         /* This does not emit open-state-changed to keep the focus on
          * text applications. */
+        this.emit('open-state-changed', true);
     },
 
     close: function(animate) {
@@ -91,5 +94,6 @@ PopupMenuNoOpenStateChanged.prototype = {
 
         /* This does not emit open-state-changed to keep the focus on
          * text applications. */
+        this.emit('open-state-changed', false);
     }
 };
