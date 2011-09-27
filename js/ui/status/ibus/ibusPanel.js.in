@@ -273,11 +273,17 @@ IBusPanel.prototype = {
         item.connect('activate',
                      Lang.bind(this, this._preferencesItemShellActivateCB));
         this._indicator.menu.addMenuItem(item);
-        let item = new PopupMenu.PopupImageMenuItem(_("Keyboard configuration"),
-                                                    'preferences-desktop');
-        item.connect('activate',
-                     Lang.bind(this, this._g_c_cItemShellActivateCB));
-        this._indicator.menu.addMenuItem(item);
+        this._indicator.menu.addSettingsAction(_("Region and Language Settings"),
+                                               'gnome-region-panel.desktop');
+        this._indicator.menu.addAction(_("Show Keyboard Layout"),
+                                       Lang.bind(this, function() {
+            Main.overview.hide();
+            let xkbGroupID = this._xkbGroupID;
+            if (xkbGroupID < 0) {
+                xkbGroupID = 0;
+            }
+            Util.spawn(['gkbd-keyboard-display', '-g', String(xkbGroupID + 1)]);
+        }));
         item = new PopupMenu.PopupImageMenuItem(_("Restart"), 'reload');
         item.connect('activate',
                      Lang.bind(this, this._restartItemShellActivateCB));
@@ -513,11 +519,6 @@ IBusPanel.prototype = {
         GLib.child_watch_add(0, this._setupPid,
                              Lang.bind(this, this._childSetupWatchCB),
                              null);
-    },
-
-    _g_c_cItemShellActivateCB: function(item, event, user_data) {
-        let app = Shell.AppSystem.get_default().get_app('gnome-region-panel.desktop');
-        app.activate(-1);
     },
 
     _restartItemShellActivateCB: function(item, event, user_data) {
