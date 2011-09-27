@@ -452,17 +452,9 @@ IBusPanel.prototype = {
         return true;
     },
 
-    _imMenuItemStatusActivateCB: function(item) {
-        /* this._focusIC is null on gnome-shell because focus-in event is 
-         * happened. So I moved set_engine in focusIn. */
-        if (this._focusIC == null) {
-            if (item._engine != null) {
-                this._activeEngine = item._engine;
-            }
-            return;
-        }
-        if (item._engine != null) {
-            if (this._useBridgeHotkey() && item._engine.isBridge) {
+    _imMenuItemStatusActivateReal: function(engine) {
+        if (engine != null) {
+            if (this._useBridgeHotkey() && engine.isBridge) {
                 let engines = this._bus.list_active_engines();
                 let currentEngine = null;
                 currentEngine = (this._focusIC != null && this._focusIC.get_engine());
@@ -474,20 +466,32 @@ IBusPanel.prototype = {
                     currentEngine.name.substring(0, this._defaultBridgeEngineName.length)
                         ==  this._defaultBridgeEngineName) {
                     this._disabledEnginesPrevID = this._disabledEnginesID;
-                    this._disabledEnginesSwapped = 0;
+                    this._disabledEnginesSwapped = 2;
                 } else {
                     this._disabledEnginesPrevID = -1;
                 }
-                this._disabledEnginesID = item._engine.disabledEnginesID;
+                this._disabledEnginesID = engine.disabledEnginesID;
                 this._focusIC.set_engine(this._disabledEngines[this._disabledEnginesID].name);
             } else {
                 this._disabledEnginesPrevID = -1;
-                this._focusIC.set_engine(item._engine.name);
+                this._focusIC.set_engine(engine.name);
             }
         } else {
             this._disabledEnginesPrevID = -1;
             this._focusIC.disable();
         }
+    },
+
+    _imMenuItemStatusActivateCB: function(item) {
+        /* this._focusIC is null on gnome-shell because focus-in event is 
+         * happened. So I moved set_engine in focusIn. */
+        if (this._focusIC == null) {
+            if (item._engine != null) {
+                this._activeEngine = item._engine;
+            }
+            return;
+        }
+        this._imMenuItemStatusActivateReal(item._engine);
     },
 
     _imMenuItemShellActivateCB: function(item, event) {
@@ -644,19 +648,49 @@ IBusPanel.prototype = {
             this._disabledEngines != null &&
             this._disabledEnginesID < this._disabledEngines.length) {
             if (changedState && this._disabledEnginesPrevID != -1) {
-                // stateChanged is always called twice because we change
-                // the engine. So the first two calls are ignored here.
+                /* stateChanged is always called triple because we change
+                 * the engine. So the first two calls are ignored here.
+                 * Since this._disabledEnginesPrevID needs to be reseted
+                 * to -1 and and stateChanged is called multiple times.
+                 * engine.layout is not used.
+                 *
+                 * When stateChanged is called by Control + Space,
+                 * this._disabledEnginesID and this._disabledEnginesPrevID
+                 * are toggled because this._disabledEnginesID is the
+                 * current XKB group id and this._disabledEnginesPrevID
+                 * is the next XKB group id.
+                 *
+                 * When stateChanged is called by ibus activate menu,
+                 * this._disabledEnginesID is the XKB group id.
+                 *
+                 * FIXME: If this._activeEngine is used, focusIn event is
+                 * called by either choosing ibus menu item or switching
+                 * input contexts.
+                 * So there is a bug: After XKB group is switched by
+                 * ibus menu, if the input contexts are switched, 
+                 * the next toggled input method has next XKB group keymap
+                 * instead of the current XKB group keymap.
+                 * focusIn event don't know either choosing ibus menu or 
+                 * switching input contexts are happened.
+                 */
                 if (this._disabledEnginesSwapped < 2) {
-                    this._disabledEnginesSwapped = 
-                        this._disabledEnginesSwapped + 1;
-                } else {
                     let x = this._disabledEnginesPrevID;
                     this._disabledEnginesPrevID = this._disabledEnginesID;
                     this._disabledEnginesID = x;
-                    this._disabledEnginesSwapped = 1;
+                    this._disabledEnginesSwapped = 
+                        (this._disabledEnginesSwapped == 0) ? 1 : 0;
+                } else {
+                    this._disabledEnginesSwapped = 
+                        (this._disabledEnginesSwapped < 4) ?
+                        this._disabledEnginesSwapped + 1 : 0;
                 }
             }
             let retval = this._disabledEngines[this._disabledEnginesID].layout;
+            /* engine is an input-method or a keymap and if engine is
+             * a keymap, the layout is not 'default'.
+             * if engine is an input-method, the layout is merged with the
+             * current XKB keymap here.
+             */
             if (engine.layout != null && 
                 engine.layout.substring(0, 'default'.length) == 'default') {
                 return this._mergeModelsAndOptions(retval, engine.layout);
@@ -708,7 +742,15 @@ IBusPanel.prototype = {
                     model = null;
                 }
                 let modelDesc = _("Default Layout");
-                if (model != null) {
+                if (i == 0) {
+                    let len = 0;
+                    for (let j = 0; j < models.length; j++) {
+                        len += models[j].length;
+                    }
+                    if (len != 0) {
+                        modelDesc = modelDesc + ' (' + model + ')';
+                    }
+                } else if (model != null) {
                     modelDesc = modelDesc + ' (' + model + ')';
                 }
                 let name = this._defaultBridgeEngineName
@@ -910,7 +952,7 @@ IBusPanel.prototype = {
         let enabled = this._focusIC.is_enabled();
         this._languageBar.setEnabled(enabled);
         if (this._activeEngine != null) {
-            this._focusIC.set_engine(this._activeEngine.name);
+            this._imMenuItemStatusActivateReal(this._activeEngine);
             this._activeEngine = null;
         }
 
