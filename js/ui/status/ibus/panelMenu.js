@@ -38,7 +38,6 @@ SystemStatusLabelButton.prototype = {
     _init: function(label, iconName, tooltipText) {
         PanelMenu.Button.prototype._init.call(this, 0.0);
         this._initMenu();
-        this._iconActor = null;
         this._iconName = null;
         this._iconActor = null;
         this._label = null;
@@ -65,25 +64,36 @@ SystemStatusLabelButton.prototype = {
         this.menu.actor.hide();
     },
 
-    setIcon: function(iconName) {
-        this._iconName = iconName;
-        if (this._iconActor)
+    _clearActor: function() {
+        if (this._iconActor != null) {
+            this.actor.remove_actor(this._iconActor);
             this._iconActor.destroy();
+            this._iconActor = null;
+            this._iconName = null;
+        }
+        if (this._labelActor) {
+            this.actor.remove_actor(this._labelActor);
+            this._labelActor.destroy();
+            this._labelActor = null;
+            this._label = null;
+        }
+    },
+
+    setIcon: function(iconName) {
+        this._clearActor();
+        this._iconName = iconName;
         this._iconActor = new St.Icon({ icon_name: iconName,
                                         icon_type: St.IconType.SYMBOLIC,
                                         style_class: 'system-status-icon' });
-        this.actor.set_child(null);
-        this.actor.set_child(this._iconActor);
+        this.actor.add_actor(this._iconActor);
         this.actor.queue_redraw();
     },
 
     setLabel: function(label) {
+        this._clearActor();
         this._label = label;
-        if (this._labelActor)
-            this._labelActor.destroy();
         this._labelActor = new St.Label({ text: label });
-        this.actor.set_child(null);
-        this.actor.set_child(this._labelActor);
+        this.actor.add_actor(this._labelActor);
         this.actor.queue_redraw();
     },
 
