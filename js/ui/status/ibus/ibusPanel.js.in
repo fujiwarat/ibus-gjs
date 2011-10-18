@@ -46,6 +46,7 @@ IBusPanel.prototype = {
     _init: function(bus, indicator) {
         this._indicator = indicator;
         this._setupPid = -1;
+        this._useSysLayoutSystem = Config.HAVE_IBUS_XKB;
         let prefix = Config.IBUS_PREFIX;
         let dataDir = Config.IBUS_PKGDATADIR;
         this._setupCmd = prefix + '/bin/ibus-setup';
@@ -88,7 +89,6 @@ IBusPanel.prototype = {
 
     _initBus: function(bus) {
         this._bus = bus;
-        this._useSysLayout = this._bus.get_use_sys_layout();
         this._focusIC = null;
 
         // connect bus signal
@@ -115,6 +115,7 @@ IBusPanel.prototype = {
                                                     null);
 
         // init xkb
+        this._useSysLayoutUser = true;
         this._defaultLayout = 'default';
         this._defaultModel = 'default';
         this._defaultOption = 'default';
@@ -130,22 +131,27 @@ IBusPanel.prototype = {
         } catch (e) {
             // This feature is not available.
         }
-        this._disabledEngines = null;
+        this._disabledEngines = [];
         this._disabledEnginesID = -1;
         this._disabledEnginesPrevID = -1;
         this._disabledEnginesSwapped = 0;
         this._xkbGroupID = -1;
 
         this._xkblayout = new XKBLayout.XKBLayout(this._config);
+        if (!this._useSysLayoutSystem) {
+            this._useSysLayoutUser = false;
+            return true;
+        }
         /* Currently GLib.Variant is not implemented. bug #622344 */
-        let useXkb = true;
+        let useXkb = this._bus.get_use_sys_layout();
         /*
         let useXkb = this._config.get_value('general',
                                             'use_system_keyboard_layout',
                                             false);
         */
         if (!useXkb) {
-            this._xkblayout.useXkb(useXkb);
+            this._useSysLayoutUser = false;
+            this._xkblayout.useXkb(false);
         }
         let value = 'default';
         /*
@@ -217,6 +223,13 @@ IBusPanel.prototype = {
                             Lang.bind(this, this.updateProperty));
         this._panel.connect('state-changed',
                             Lang.bind(this, this.stateChanged));
+    },
+
+    _useSysLayout: function() {
+        if (!this._useSysLayoutSystem) {
+            return false;
+        }
+        return this._useSysLayoutUser;
     },
 
     _useBridgeHotkey: function() {
@@ -312,7 +325,7 @@ IBusPanel.prototype = {
     },
 
     _getDisabledEngine: function(engine) {
-        if (this._disabledEngines == null) {
+        if (this._disabledEngines.length == 0) {
             return null;
         }
 
@@ -396,7 +409,7 @@ IBusPanel.prototype = {
     _addIMOffMenuItem: function() {
         let item = new PopupMenu.PopupImageMenuItem(_("Turn off input method"),
                                                     'window-close');
-        item._engine = null;
+        item._engine = 'none';
         item.connect('activate',
                      Lang.bind(this, this._imMenuItemShellActivateCB));
         if (this._focusIC == null || !this._focusIC.is_enabled()) {
@@ -458,8 +471,10 @@ IBusPanel.prototype = {
     },
 
     _imMenuItemStatusActivateReal: function(engine) {
-        if (engine != null) {
-            if (this._useBridgeHotkey() && engine.isBridge) {
+        if (typeof engine.valueOf() == 'object') {
+            if (this._disabledEngines.length > 0 &&
+                this._useBridgeHotkey() &&
+                engine.isBridge) {
                 let engines = this._bus.list_active_engines();
                 let currentEngine = null;
                 currentEngine = (this._focusIC != null && this._focusIC.get_engine());
@@ -491,9 +506,7 @@ IBusPanel.prototype = {
         /* this._focusIC is null on gnome-shell because focus-in event is 
          * happened. So I moved set_engine in focusIn. */
         if (this._focusIC == null) {
-            if (item._engine != null) {
-                this._activeEngine = item._engine;
-            }
+            this._activeEngine = item._engine;
             return;
         }
         this._imMenuItemStatusActivateReal(item._engine);
@@ -655,7 +668,7 @@ IBusPanel.prototype = {
             return engine.layout;
         } else if (this._useBridgeHotkey() &&
             this._disabledEnginesID >= 0 &&
-            this._disabledEngines != null &&
+            this._disabledEngines.length > 0 &&
             this._disabledEnginesID < this._disabledEngines.length) {
             if (changedState && this._disabledEnginesPrevID != -1) {
                 /* stateChanged is always called triple because we change
@@ -715,6 +728,10 @@ IBusPanel.prototype = {
     },
 
     _setDefaultLayoutEngine: function(useBridgeHotkey) {
+        if (!this._useSysLayout()) {
+            return;
+        }
+
         let defaultLayout = this._defaultLayout;
         let defaultModel = this._defaultModel;
 
@@ -731,8 +748,7 @@ IBusPanel.prototype = {
         if (defaultModel != null && defaultModel != '') {
             models = defaultModel.split(',');
         }
-        if (this._disabledEngines == null || this._disabledEngines == []) {
-            this._disabledEngines = [];
+        if (this._disabledEngines.length == 0) {
             for (let i = 0; layouts[i] != null; i++) {
                 let layout = layouts[i];
                 let registry = new IBus.XKBConfigRegistry();
@@ -779,7 +795,7 @@ IBusPanel.prototype = {
         if (!useBridgeHotkey) {
             return;
         }
-        if (this._disabledEngines != null && this._disabledEngines != []) {
+        if (this._disabledEngines.length > 0) {
             if (!this._focusIC == null) {
                 return;
             }
@@ -806,7 +822,7 @@ IBusPanel.prototype = {
             }
             this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
             this._setIMName(null);
-            if (this._useSysLayout) {
+            if (this._useSysLayout()) {
                 this._xkblayout.setLayout();
             }
         } else {
@@ -831,13 +847,13 @@ IBusPanel.prototype = {
                 }
                 this._setIMIcon(engine.icon, imIcon);
                 this._setIMName(engine.longname);
-                if (this._useSysLayout) {
+                if (this._useSysLayout()) {
                     this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, reset));
                 }
             } else {
                 this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
                 this._setIMName(null);
-                if (this._useSysLayout) {
+                if (this._useSysLayout()) {
                     this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, reset));
                 }
             }
@@ -851,7 +867,7 @@ IBusPanel.prototype = {
             }
             this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
             this._setIMName(null);
-            if (this._useSysLayout) {
+            if (this._useSysLayout()) {
                 this._xkblayout.setLayout();
             }
         } else {
@@ -866,13 +882,13 @@ IBusPanel.prototype = {
                 }
                 this._setIMIcon(engine.icon, imIcon);
                 this._setIMName(engine.longname);
-                if (this._useSysLayout) {
+                if (this._useSysLayout()) {
                     this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, false));
                 }
             } else {
                 this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
                 this._setIMName(null);
-                if (this._useSysLayout) {
+                if (this._useSysLayout()) {
                     this._xkblayout.setLayout();
                 }
             }
@@ -969,7 +985,8 @@ IBusPanel.prototype = {
         let useBridgeHotkey = this._useBridgeHotkey();
         this._setDefaultLayoutEngine(useBridgeHotkey);
         if (useBridgeHotkey) {
-            if (this._xkbGroupID != this._xkblayout.getGroup()) {
+            if (this._useSysLayout() &&
+                this._xkbGroupID != this._xkblayout.getGroup()) {
                 this._xkbGroupID = this._xkblayout.getGroup();
                 this._disabledEnginesID = this._xkbGroupID;
             }
