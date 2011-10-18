@@ -770,7 +770,7 @@ IBusPanel.prototype = {
                 let modelDesc = _("Default Layout");
                 if (i == 0) {
                     let len = 0;
-                    for (let j = 0; j < models.length; j++) {
+                    for (let j = 0; models && j < models.length; j++) {
                         len += models[j].length;
                     }
                     if (len != 0) {
