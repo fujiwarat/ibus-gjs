@@ -971,6 +971,13 @@ IBusPanel.prototype = {
             this._imMenuItemStatusActivateReal(this._activeEngine);
             this._activeEngine = null;
         }
+        if (this._activeIBusProperties != null) {
+            for (let i = 0; i < this._activeIBusProperties.length; i++) {
+                this._panel.property_activate(this._activeIBusProperties[i][0],
+                                              this._activeIBusProperties[i][1]);
+            }
+            this._activeIBusProperties = null;
+        }
 
         let useBridgeHotkey = this._useBridgeHotkey();
         this._setDefaultLayoutEngine(useBridgeHotkey);
@@ -1037,8 +1044,17 @@ IBusPanel.prototype = {
         this._panel.candidate_clicked(index, button, state);
     },
 
-    propertyActivate: function(propName, prop_state) {
-        this._panel.property_activate(propName, prop_state);
+    propertyActivate: function(propName, propState) {
+        /* this._focusIC is null on gnome-shell because focus-in event is 
+         * happened. So I moved property_activate in focusIn. */
+        if (this._focusIC == null) {
+            if (this._activeIBusProperties == null) {
+                this._activeIBusProperties = [];
+            }
+            this._activeIBusProperties.push([propName, propState]);
+            return;
+        }
+        this._panel.property_activate(propName, propState);
     },
 
     propertyShow: function(propName) {
