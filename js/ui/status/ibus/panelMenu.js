@@ -24,8 +24,6 @@ const Lang = imports.lang;
 const PanelMenu = imports.ui.panelMenu;
 const Main = imports.ui.main;
 
-const PopupMenu = imports.ui.status.ibus.popupMenu;
-
 
 function SystemStatusLabelButton(label, iconName, tooltipText) {
     this._init(label, iconName, tooltipText);
@@ -37,7 +35,6 @@ SystemStatusLabelButton.prototype = {
 
     _init: function(label, iconName, tooltipText) {
         PanelMenu.Button.prototype._init.call(this, 0.0);
-        this._initMenu();
         this._iconName = null;
         this._iconActor = null;
         this._label = null;
@@ -48,20 +45,6 @@ SystemStatusLabelButton.prototype = {
             this.setIcon(iconName);
         }
         this.setTooltip(tooltipText);
-    },
-
-    /* The custom PopupMenu does not emit open-state-changed so that
-     * the focus is kept on the text applications. */
-    _initMenu: function() {
-        if (this.menu) {
-            this.menu.close();
-        }
-        this.menu = new PopupMenu.PopupMenuNoOpenStateChanged(this.actor,
-                                                              St.Align.START,
-                                                              St.Side.TOP);
-        this.menu.actor.add_style_class_name('panel-menu');
-        Main.uiGroup.add_actor(this.menu.actor);
-        this.menu.actor.hide();
     },
 
     _clearActor: function() {
