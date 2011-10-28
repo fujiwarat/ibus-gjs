@@ -791,6 +791,9 @@ IBusPanel.prototype = {
             }
             this._xkbGroupID = this._xkblayout.getGroup();
             this._disabledEngines_id = this._xkbGroupID;
+            if (useBridgeHotkey && this._disabledEngines.length > 0) {
+                this._focusIC.set_xkb_engines(this._disabledEngines);
+            }
         }
         if (!useBridgeHotkey) {
             return;
