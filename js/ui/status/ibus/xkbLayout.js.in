@@ -263,7 +263,8 @@ XKBLayout.prototype = {
         let needUsLayout = false;
         for (let i = 0; i < this._xkbLatinLayouts.length; i ++) {
             let latinLayout = this._xkbLatinLayouts[i] + '';
-            if (layout == latinLayout) {
+            // layout 'in' and model 'eng' is English layout.
+            if (layout == latinLayout && model != 'eng') {
                 needUsLayout = true;
                 break;
             }
