@@ -717,6 +717,27 @@ IBusPanel.prototype = {
         }
     },
 
+    _registryGetLangFromLayout: function(registry, layout, model) {
+        let langs = null;
+        let lang = 'en';
+        let label = null;
+        if (model == '') {
+            model = null;
+        }
+        if (model != null) {
+            label = layout + '(' + model + ')';
+            langs = registry.layout_lang_get_langs(label);
+        }
+        if (langs == null || langs.length == 0) {
+            label = layout;
+            langs = registry.layout_lang_get_langs(label);
+        }
+        if (langs != null && langs.length > 0) {
+            lang = langs[0] + '';
+        }
+        return lang;
+    },
+
     _setDefaultLayoutEngine: function(useBridgeHotkey) {
         if (!this._useSysLayout()) {
             return;
@@ -742,12 +763,14 @@ IBusPanel.prototype = {
             for (let i = 0; layouts[i] != null; i++) {
                 let layout = layouts[i];
                 let registry = new IBus.XKBConfigRegistry();
-                let langs = registry.layout_lang_get_langs(layout);
-                let lang = 'en';
-                if (langs != null) {
-                    lang = langs[0] + '';
-                }
                 let model = null;
+                if (models != null && i < models.length) {
+                    model = models[i];
+                }
+                let lang = this._registryGetLangFromLayout(registry,
+                                                           layout,
+                                                           model);
+                model = null;
                 if (i == 0) {
                     layout = defaultLayout;
                     model = defaultModel;
@@ -760,8 +783,11 @@ IBusPanel.prototype = {
                 let modelDesc = _("Default Layout");
                 if (i == 0) {
                     let len = 0;
-                    for (let j = 0; models && j < models.length; j++) {
-                        len += models[j].length;
+                    // layout 'in' and model 'eng' is English layout.
+                    if (model != 'eng') {
+                        for (let j = 0; models && j < models.length; j++) {
+                            len += models[j].length;
+                        }
                     }
                     if (len != 0) {
                         modelDesc = modelDesc + ' (' + model + ')';
