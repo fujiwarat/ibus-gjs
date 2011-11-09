@@ -20,6 +20,7 @@
 
 const GLib = imports.gi.GLib;
 const IBus = imports.gi.IBus;
+const Lang = imports.lang;
 
 const Config = imports.misc.config;
 const Util = imports.misc.util;
@@ -27,46 +28,9 @@ const Util = imports.misc.util;
 const XKB_SESSION_TIME_OUT = 30.0;
 const ICON_KEYBOARD = 'input-keyboard-symbolic';
 const DEFAULT_BRIDGE_ENGINE_NAME = 'xkb:layout:default:';
+const XMODMAP_CMD = 'xmodmap';
+const XMODMAP_KNOWN_FILES = ['.xmodmap', '.xmodmaprc', '.Xmodmap', '.Xmodmaprc'];
 
-
-function _trySpawnWithPipes(argv) {
-    let retval = [false, null, null, -1];
-
-    try {
-        retval = GLib.spawn_sync(null, argv, null,
-                                 GLib.SpawnFlags.SEARCH_PATH,
-                                 null, null);
-    } catch (err) {
-        if (err.code == GLib.SpawnError.G_SPAWN_ERROR_NOENT) {
-            err.message = _("Command not found");
-        } else {
-            // The exception from gjs contains an error string like:
-            //   Error invoking GLib.spawn_command_line_async: Failed to
-            //   execute child process 'foo' (No such file or directory)
-            // We are only interested in the part in the parentheses. (And
-            // we can't pattern match the text, since it gets localized.)
-            err.message = err.message.replace(/.*\((.+)\)/, '$1');
-        }
-
-        throw err;
-    }
-    return retval;
-}
-
-function _handleSpawnError(command, err) {
-    let title = _("Execution of '%s' failed:").format(command);
-    log(title);
-    log(err.message);
-}
-
-function _spawnWithPipes(argv) {
-    try {
-        return _trySpawnWithPipes(argv);
-    } catch (err) {
-        _handleSpawnError(argv[0], err);
-        return [false, null, err.message, -1];
-    }
-}
 
 function XKBLayout(config, command) {
     this._init(config, command);
@@ -77,6 +41,9 @@ XKBLayout.prototype = {
         this._config = null;
         this._command = Config.IBUS_XKB;
         this._useXkb = Config.HAVE_IBUS_XKB;
+        this._useXmodmap = true;
+        this._xkbPid = -1;
+        this._xmodmapPid = -1;
 
         if (config != undefined) {
             this._config = config;
@@ -103,8 +70,12 @@ XKBLayout.prototype = {
         /*
         if (this._config != null) {
             this._xkbLatinLayouts = this._config.get_value('general',
-                                                           'xkb_latin_layouts',
+                                                           'xkb-latin-layouts',
                                                            []);
+            this._useXmodmap = this._config.get_value(
+                'general',
+                'use-xmodmap',
+                GLib.Variant.new_boolean(true)).get_boolean();
         }
         */
     },
@@ -147,7 +118,7 @@ XKBLayout.prototype = {
         let retval = null;
         let basename = GLib.path_get_basename(this._command);
         let argv = [this._command, basename, arg];
-        let [result, output, std_err, status] = _spawnWithPipes(argv);
+        let [result, output, std_err, status] = this._spawnWithPipes(argv);
         if (!result) {
             return null;
         }
@@ -160,6 +131,157 @@ XKBLayout.prototype = {
             }
         }
         return retval;
+    },
+
+    _getFullPath: function(command) {
+        let paths = GLib.getenv('PATH');
+        if (paths != null) {
+            paths = paths.split(':');
+        } else {
+            paths = ['/usr/bin', '/bin'];
+        }
+        for (let i = 0; paths.length; i++) {
+            let dir = paths[i];
+            let filepath = dir + '/' + command;
+            if (GLib.file_test(filepath, GLib.FileTest.EXISTS)) {
+                return filepath;
+            }
+        }
+        return null;
+    },
+
+    _setLayoutCB: function(pid, status, data) {
+        if (this._xkbPid != pid) {
+            log('XkbLayout.setLayout has another pid.');
+            return;
+        }
+        this._xkbPid = -1;
+        this.setXmodmap();
+    },
+
+    _setXmodmapCB: function(pid, status, data) {
+        if (this._xmodmapPid != pid) {
+            log('XkbLayout.setXmodmap has another pid.');
+            return;
+        }
+        this._xmodmapPid = -1;
+    },
+
+    _trySpawnWithPipes: function(argv) {
+        let retval = [false, null, null, -1];
+
+        try {
+            retval = GLib.spawn_sync(null, argv, null,
+                                     GLib.SpawnFlags.SEARCH_PATH,
+                                     null, null);
+        } catch (err) {
+            if (err.code == GLib.SpawnError.G_SPAWN_ERROR_NOENT) {
+                err.message = _("Command not found");
+            } else {
+                // The exception from gjs contains an error string like:
+                //   Error invoking GLib.spawn_command_line_async: Failed to
+                //   execute child process 'foo' (No such file or directory)
+                // We are only interested in the part in the parentheses. (And
+                // we can't pattern match the text, since it gets localized.)
+                err.message = err.message.replace(/.*\((.+)\)/, '$1');
+            }
+
+            throw err;
+        }
+        return retval;
+    },
+
+    _trySpawnAsyncXkb: function(argv) {
+        let retval = false;
+        let pid = -1;
+
+        try {
+            [retval, pid] = GLib.spawn_async(null, argv, null,
+                                      GLib.SpawnFlags.SEARCH_PATH |
+                                      GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                                      null, null);
+            this._xkbPid = pid;
+            GLib.child_watch_add(0, this._xkbPid,
+                                 Lang.bind(this, this._setLayoutCB),
+                                 null);
+        } catch (err) {
+            if (err.code == GLib.SpawnError.G_SPAWN_ERROR_NOENT) {
+                err.message = _("Command not found");
+            } else {
+                // The exception from gjs contains an error string like:
+                //   Error invoking GLib.spawn_command_line_async: Failed to
+                //   execute child process 'foo' (No such file or directory)
+                // We are only interested in the part in the parentheses. (And
+                // we can't pattern match the text, since it gets localized.)
+                err.message = err.message.replace(/.*\((.+)\)/, '$1');
+            }
+
+            throw err;
+        }
+        return retval;
+    },
+
+    _trySpawnAsyncXmodmap: function(argv) {
+        let retval = false;
+        let pid = -1;
+
+        try {
+            [retval, pid] = GLib.spawn_async(null, argv, null,
+                                      GLib.SpawnFlags.SEARCH_PATH |
+                                      GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                                      null, null);
+            this._xmodmapPid = pid;
+            GLib.child_watch_add(0, this._xmodmapPid,
+                                 Lang.bind(this, this._setXmodmapCB),
+                                 null);
+        } catch (err) {
+            if (err.code == GLib.SpawnError.G_SPAWN_ERROR_NOENT) {
+                err.message = _("Command not found");
+            } else {
+                // The exception from gjs contains an error string like:
+                //   Error invoking GLib.spawn_command_line_async: Failed to
+                //   execute child process 'foo' (No such file or directory)
+                // We are only interested in the part in the parentheses. (And
+                // we can't pattern match the text, since it gets localized.)
+                err.message = err.message.replace(/.*\((.+)\)/, '$1');
+            }
+
+            throw err;
+        }
+        return retval;
+    },
+
+    _handleSpawnError: function(command, err) {
+        let title = _("Execution of '%s' failed:").format(command);
+        log(title);
+        log(err.message);
+    },
+
+    _spawnWithPipes: function(argv) {
+        try {
+            return this._trySpawnWithPipes(argv);
+        } catch (err) {
+            this._handleSpawnError(argv[0], err);
+            return [false, null, err.message, -1];
+        }
+    },
+
+    _spawnAsyncXkb: function(argv) {
+        try {
+            return this._trySpawnAsyncXkb(argv);
+        } catch (err) {
+            this._handleSpawnError(argv[0], err);
+            return false;
+        }
+    },
+
+    _spawnAsyncXmodmap: function(argv) {
+        try {
+            return this._trySpawnAsyncXmodmap(argv);
+        } catch (err) {
+            this._handleSpawnError(argv[0], err);
+            return false;
+        }
     },
 
     useXkb: function(enable) {
@@ -202,6 +324,9 @@ XKBLayout.prototype = {
         let option = 'default';
 
         if (!this._useXkb) {
+            return;
+        }
+        if (this._xkbPid != -1) {
             return;
         }
         if (layout == undefined) {
@@ -286,7 +411,6 @@ XKBLayout.prototype = {
         }
         let args = [];
         args.push(this._command);
-        args.push(GLib.path_get_basename(this._command));
         args.push('--layout');
         args.push(layout);
         if (model != null) {
@@ -297,7 +421,7 @@ XKBLayout.prototype = {
             args.push('--option');
             args.push(option);
         }
-        Util.spawn(args);
+        this._spawnAsyncXkb(args);
     },
 
     getDefaultLayout: function() {
@@ -357,6 +481,31 @@ XKBLayout.prototype = {
         this._defaultLayout = this.getLayout();
         this._defaultModel = this.getModel();
         this._defaultOption = this.getOption();
+    },
+
+    setXmodmap: function() {
+        if (!this._useXmodmap) {
+            return;
+        }
+        if (this._xmodmapPid != -1) {
+            return;
+        }
+        let xmodmapCmdPath = this._getFullPath(XMODMAP_CMD);
+        if (xmodmapCmdPath == null) {
+            xmodmapCmdPath = XMODMAP_CMD;
+        }
+        for (let i = 0; i < XMODMAP_KNOWN_FILES.length; i++) {
+            let xmodmapFile = XMODMAP_KNOWN_FILES[i];
+            let xmodmapFilePath = GLib.get_home_dir() + '/' + xmodmapFile;
+            if (!GLib.file_test(xmodmapFilePath, GLib.FileTest.EXISTS)) {
+                continue;
+            }
+            let args = [];
+            args.push(xmodmapCmdPath);
+            args.push(xmodmapFilePath);
+            this._spawnAsyncXmodmap(args);
+            break;
+        }
     }
 };
 
