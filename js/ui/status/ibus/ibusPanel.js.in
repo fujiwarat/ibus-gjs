@@ -273,10 +273,12 @@ IBusPanel.prototype = {
             let item = new PopupMenu.PopupImageMenuItem(_("No input window"),
                                                         'dialog-information');
             this._indicator.menu.addMenuItem(item);
-            return true;
+            this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         } else {
+            if (this._createIMMenuShell()) {
+                this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            }
             this._languageBar.createIMMenuShell();
-            return this._createIMMenuShell();
         }
     },
 
@@ -313,9 +315,7 @@ IBusPanel.prototype = {
 
     _onShellPanelButtonPressEvent: function(actor, event) {
         this._indicator.menu.removeAll();
-        if (this._createShellMenuForIM()) {
-            this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        }
+        this._createShellMenuForIM();
         this._createShellMenuForPopup();
     },
 
