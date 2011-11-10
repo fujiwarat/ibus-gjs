@@ -19,32 +19,22 @@
  */
 
 const St = imports.gi.St;
-const Signals = imports.signals;
 const PopupMenu = imports.ui.popupMenu;
 
 
-function PopupImageMenuItemMarkup(text, iconName) {
-    this._init(text, iconName);
+function PopupActorMenuItem(text, actor) {
+    this._init(text, actor);
 }
 
-/* We'd like to show the markup text likes bold type. */
-PopupImageMenuItemMarkup.prototype = {
+/* We'd like to add an actor at the end. */
+PopupActorMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (text, iconName) {
+    _init: function (text, actor) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this);
 
         this.label = new St.Label({ text: text });
-        let clutter_text = this.label.get_clutter_text();
-        clutter_text.set_markup(text);
         this.addActor(this.label);
-        this._icon = new St.Icon({ style_class: 'popup-menu-icon' });
-        this.addActor(this._icon, { align: St.Align.END });
-
-        this.setIcon(iconName);
-    },
-
-    setIcon: function(name) {
-        this._icon.icon_name = name;
+        this.addActor(actor, { align: St.Align.END });
     }
 };
