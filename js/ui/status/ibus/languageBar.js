@@ -23,7 +23,6 @@ const Lang = imports.lang;
 const Signals = imports.signals;
 const PopupMenu = imports.ui.popupMenu;
 
-const ShellMenu = imports.ui.status.ibus.shellMenu;
 const IMEDialog = imports.ui.status.ibus.imeDialog;
 
 function LanguageBar(indicator) {
@@ -120,15 +119,12 @@ LanguageBar.prototype = {
         for (let i = 0; props.get(i) != null; i++) {
             prop = props.get(i);
             if (prop.get_prop_type() == IBus.PropType.NORMAL) {
-                //item = new ShellMenu.ImageShellMenuItem(prop);
                 item = new IMEDialog.ImageShellMenuItem(imeDialog, prop);
             }
             else if (prop.get_prop_type() == IBus.PropType.TOGGLE) {
-                //item = new ShellMenu.CheckShellMenuItem(prop);
                 item = new IMEDialog.ToggleShellMenuItem(imeDialog, prop);
             }
             else if (prop.get_prop_type() == IBus.PropType.RADIO) {
-                //item = new ShellMenu.RadioShellMenuItem(radioGroup, prop);
                 item = new IMEDialog.RadioShellMenuItem(imeDialog, radioGroup, prop);
                 radioGroup.push(item);
                 for (let j = 0; j < radioGroup.length; j++) {
@@ -136,14 +132,10 @@ LanguageBar.prototype = {
                 }
             }
             else if (prop.get_prop_type() == IBus.PropType.SEPARATOR) {
-                item = new ShellMenu.SeparatorShellMenuItem();
-                radioGroup = null;
+                item = new IMEDialog.SeparatorShellMenuItem();
+                radioGroup = [];
             }
             else if (prop.get_prop_type() == IBus.PropType.MENU) {
-                //let submenu = new ShellMenu.ShellMenu(prop);
-                //submenu.connect('property-activate',
-                //                Lang.bind(this, this._onItemPropertyActivate));
-                //item = submenu;
                 item = new IMEDialog.SubMenuItem(imeDialog, prop);
             }
             else {
@@ -159,15 +151,10 @@ LanguageBar.prototype = {
             }
 
             this._menuItems.push(item);
-            //this._indicator.menu.addMenuItem(item.getRaw());
             imeDialog.contentLayout.add(item.actor);
             item.connect('property-activate',
                          Lang.bind(this, this._onItemPropertyActivate));
         }
-
-        //if (props.get(0) != null) {
-        //    this._indicator.menu.addMenuItem(new ShellMenu.SeparatorShellMenuItem().getRaw());
-        //}
     }
 };
 

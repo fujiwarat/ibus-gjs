@@ -32,7 +32,6 @@ nobase_dist_js_DATA = 	\
 	ui/status/ibus/panelMenu.js	\
 	ui/status/ibus/popupMenu.js	\
 	ui/status/ibus/propItem.js	\
-	ui/status/ibus/shellMenu.js	\
 	ui/status/ibus/xkbLayout.js	\
 	$(NULL)
 

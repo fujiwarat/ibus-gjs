@@ -8,5 +8,4 @@ js/ui/status/ibus/languageBar.js
 js/ui/status/ibus/panelMenu.js
 js/ui/status/ibus/popupMenu.js
 js/ui/status/ibus/propItem.js
-js/ui/status/ibus/shellMenu.js
 js/ui/status/ibus/xkbLayout.js.in
