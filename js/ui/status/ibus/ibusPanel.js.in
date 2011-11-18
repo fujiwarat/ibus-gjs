@@ -285,7 +285,7 @@ IBusPanel.prototype = {
     },
 
     _createShellMenuForPopup: function() {
-        let item = new PopupMenu.PopupImageMenuItem(_("Preferences"),
+        let item = new PopupMenu.PopupImageMenuItem(_("Input Method Preferences"),
                                                     'preferences-desktop');
         item.connect('activate',
                      Lang.bind(this, this._preferencesItemShellActivateCB));
