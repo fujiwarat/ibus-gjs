@@ -70,11 +70,11 @@ XKBLayout.prototype = {
         /*
         if (this._config != null) {
             this._xkbLatinLayouts = this._config.get_value('general',
-                                                           'xkb-latin-layouts',
+                                                           'xkb_latin_layouts',
                                                            []);
             this._useXmodmap = this._config.get_value(
                 'general',
-                'use-xmodmap',
+                'use_xmodmap',
                 GLib.Variant.new_boolean(true)).get_boolean();
         }
         */
