@@ -74,10 +74,14 @@ XKBLayout.prototype = {
                 this._xkbLatinLayouts.push(
                     value.get_child_value(i).dup_string()[0]);
             }
-            this._useXmodmap = this._config.get_value(
+            let useXmodmapValue = this._config.get_value(
                 'general',
-                'use_xmodmap',
-                GLib.Variant.new_boolean(true)).get_boolean();
+                'use-xmodmap',
+                GLib.Variant.new_boolean(true));
+            if (useXmodmapValue != null)
+                this._useXmodmap = useXmodmapValue.get_boolean();
+            else
+                this._useXmodmap = false;
         }
     },
 
