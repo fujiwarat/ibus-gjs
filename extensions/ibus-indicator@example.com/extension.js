@@ -21,28 +21,18 @@ function main() {
         window.C_ = Gettext.pgettext;
         window.ngettext = Gettext.ngettext;
     }
-    Panel.STANDARD_TRAY_ICON_ORDER.push('ibus');
-    Panel.STANDARD_TRAY_ICON_SHELL_IMPLEMENTATION['ibus'] = Indicator.Indicator;
 }
 
 function enable() {
     if (!indicator) {
         indicator = new Indicator.Indicator();
     }
-    if (!menus) {
-        menus = new PopupMenu.PopupMenuManager(indicator);
-    }
-    menus.addMenu(indicator.menu);
-    Main.statusIconDispatcher.emit('status-icon-added', indicator.actor, 'ibus');
+    Main.panel.addToStatusArea('ibus', indicator, 0);
 }
 
 function disable() {
     if (indicator) {
-        if (menus) {
-            menus.removeMenu(indicator.menu);
-            menus = null;
-        }
-        Main.statusIconDispatcher.emit('status-icon-removed', indicator.actor);
+        indicator.destroy();
         indicator = null;
     }
 }
