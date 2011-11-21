@@ -51,6 +51,9 @@ XKBLayout.prototype = {
         if (this._command == null) {
             this._useXkb = false;
         }
+        if (this._useXkb == false) {
+            this._useXmodmap = false;
+        }
         this._defaultLayout = this.getLayout();
         this._defaultModel = this.getModel();
         this._defaultOption = this.getOption();
@@ -74,10 +77,12 @@ XKBLayout.prototype = {
                 this._xkbLatinLayouts.push(
                     value.get_child_value(i).dup_string()[0]);
             }
-            this._useXmodmap = this._config.get_value(
-                'general',
-                'use_xmodmap',
-                GLib.Variant.new_boolean(true)).get_boolean();
+            if (this._useXmodmap) {
+                this._useXmodmap = this._config.get_value(
+                    'general',
+                    'use_xmodmap',
+                    GLib.Variant.new_boolean(true)).get_boolean();
+            }
         }
     },
 
