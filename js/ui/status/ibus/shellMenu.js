@@ -48,11 +48,11 @@ ShellMenu.prototype = {
     _init: function(prop) {
         PropItem.PropItem.prototype._init.call(this, prop);
 
-        this._menu = new PopupMenu.PopupSubMenuMenuItem(prop.get_label().get_text());
+        this.item = new PopupMenu.PopupSubMenuMenuItem(prop.get_label().get_text());
         this._createItems(this._prop.get_sub_props());
-        Common.actorSetSensitive(this._menu.actor,
+        Common.actorSetSensitive(this.item.actor,
                                  this._prop.get_sensitive(),
-                                 this._menu.label);
+                                 this.item.label);
     },
 
     _createItems: function(props) {
@@ -90,7 +90,7 @@ ShellMenu.prototype = {
                 item.hide();
             }
 
-            this._menu.menu.addMenuItem(item.getRaw());
+            this.item.menu.addMenuItem(item.item);
             this._subItems.push(item);
 
             if (prop.get_prop_type() != IBus.PropType.NORMAL &&
@@ -111,25 +111,21 @@ ShellMenu.prototype = {
     },
 
     addMenuItem: function(menuItem) {
-        this._menu.addMenuItem(menuItem);
-    },
-
-    getRaw: function() {
-        return this._menu;
+        this.item.addMenuItem(menuItem);
     },
 
     show: function() {
-        this._menu.actor.show();
+        this.item.actor.show();
     },
 
     destroy: function() {
-        this._menu.destroy();
+        this.item.destroy();
     },
 
     setSensitive: function(sensitive) {
-        Common.actorSetSensitive(this._menu.actor,
+        Common.actorSetSensitive(this.item.actor,
                                  sensitive,
-                                 this._menu.label);
+                                 this.item.label);
     }
 };
 
@@ -151,15 +147,15 @@ ImageShellMenuItem.prototype = {
 
     _init: function(prop) {
         PropItem.PropItem.prototype._init.call(this, prop);
-        this._item = new PopupMenu.PopupImageMenuItem(this._prop.get_label().get_text(),
-                                                      this._prop.get_icon());
-        this._activateId = this._item.connect('activate',
-                                              Lang.bind(this, this._onActivate));
+        this.item = new PopupMenu.PopupImageMenuItem(this._prop.get_label().get_text(),
+                                                     this._prop.get_icon());
+        this._activateId = this.item.connect('activate',
+                                             Lang.bind(this, this._onActivate));
 
         if (this._prop.get_visible()) {
-            this._item.actor.show();
+            this.item.actor.show();
         } else {
-            this._item.actor.hide();
+            this.item.actor.hide();
         }
     },
 
@@ -168,51 +164,45 @@ ImageShellMenuItem.prototype = {
     },
 
     propertyChanged: function() {
-        Common.actorSetSensitive(this._item.actor,
+        Common.actorSetSensitive(this.item.actor,
                                  this._prop.get_sensitive(),
-                                 this._item.label);
+                                 this.item.label);
         if (this._prop.get_visible()) {
-            this._item.actor.show();
+            this.item.actor.show();
         } else {
-            this._item.actor.hide();
+            this.item.actor.hide();
         }
     },
 
-    getRaw: function() {
-        return this._item;
-    },
-
     show: function() {
-        this._item.actor.show();
+        this.item.actor.show();
     },
 
     hide: function() {
-        this._item.actor.hide();
+        this.item.actor.hide();
     },
 
     destroy: function() {
         this.disconnect(this._activateId);
-        this._item.destroy();
+        this.item.destroy();
     },
 
     setSensitive: function(sensitive) {
-        Common.actorSetSensitive(this._item.actor,
+        Common.actorSetSensitive(this.item.actor,
                                  sensitive,
-                                 this._item.label);
+                                 this.item.label);
     },
 
     setTooltipText: function(text) {
-        /* Probably we do not need tooltip for clutter. */
-        //this._item.actor.tooltip_text = text;
-        //this._item.actor.has_tooltip = true;
+        this.item.actor.set_tooltip_text(text);
     },
 
     setSubmenu: function(submenu) {
-        this._item.addActor(submenu.actor, null, null);
+        this.item.addActor(submenu.actor, null, null);
     },
 
     setLabel: function(label) {
-        this._item.label.set_text(label);
+        this.item.label.set_text(label);
     }
 };
 
@@ -234,16 +224,16 @@ CheckShellMenuItem.prototype = {
 
     _init: function(prop) {
         PropItem.PropItem.prototype._init.call(this, prop);
-        this._item = new PopupMenu.PopupSwitchMenuItem(this._prop.get_label().get_text(),
-                                                       this._prop.get_state() == IBus.PropState.CHECKED);
+        this.item = new PopupMenu.PopupSwitchMenuItem(this._prop.get_label().get_text(),
+                                                      this._prop.get_state() == IBus.PropState.CHECKED);
 
-        this._activateId = this._item.connect('activate',
-                                              Lang.bind(this, this._onActivate));
+        this._activateId = this.item.connect('activate',
+                                             Lang.bind(this, this._onActivate));
 
         if (this._prop.get_visible()) {
-            this._item.actor.show();
+            this.item.actor.show();
         } else {
-            this._item.actor.hide();
+            this.item.actor.hide();
         }
     },
 
@@ -251,7 +241,7 @@ CheckShellMenuItem.prototype = {
         // Do not send property-activate to engine in case the event is
         // sent from engine.
         let do_emit = false;
-        if (this._item.state) {
+        if (this.item.state) {
             if (this._prop.get_state() != IBus.PropState.CHECKED) {
                 do_emit = true;
             }
@@ -268,50 +258,44 @@ CheckShellMenuItem.prototype = {
     },
 
     propertyChanged: function() {
-        this._item.setToggleState(this._prop.get_state() == IBus.PropState.CHECKED);
+        this.item.setToggleState(this._prop.get_state() == IBus.PropState.CHECKED);
         this.setSensitive(this._prop.get_sensitive());
         if (this._prop.get_visible()) {
-            this._item.actor.show();
+            this.item.actor.show();
         } else {
-            this._item.actor.hide();
+            this.item.actor.hide();
         }
     },
 
-    getRaw: function() {
-        return this._item;
-    },
-
     show: function() {
-        this._item.actor.show();
+        this.item.actor.show();
     },
 
     hide: function() {
-        this._item.actor.hide();
+        this.item.actor.hide();
     },
 
     destroy: function() {
         this.disconnect(this._activateId);
-        this._item.destroy();
+        this.item.destroy();
     },
 
     setSensitive: function(sensitive) {
-        Common.actorSetSensitive(this._item.actor,
+        Common.actorSetSensitive(this.item.actor,
                                  sensitive,
-                                 this._item.label);
+                                 this.item.label);
     },
 
     setTooltipText: function(text) {
-        /* Probably we do not need tooltip for clutter. */
-        //this._item.actor.tooltip_text = text;
-        //this._item.actor.has_tooltip = true;
+        this.item.actor.set_tooltip_text(text);
     },
 
     setSubmenu: function(submenu) {
-        this._item.addActor(submenu.actor, null, null);
+        this.item.addActor(submenu.actor, null, null);
     },
 
     setLabel: function(label) {
-        this._item.label.set_text(label);
+        this.item.label.set_text(label);
     }
 };
 
@@ -336,21 +320,21 @@ RadioShellMenuItem.prototype = {
         PropItem.PropItem.prototype._init.call(this, prop);
         this._group = group;
         this._id = group.length;
-        this._item = new PopupMenu.PopupMenuItem(this._prop.get_label().get_text());
-        this._item.state = (this._prop.get_state() == IBus.PropState.CHECKED);
-        this._item.setShowDot(this._item.state);
-        this._activateId = this._item.connect('activate',
-                                              Lang.bind(this, this._onActivate));
+        this.item = new PopupMenu.PopupMenuItem(this._prop.get_label().get_text());
+        this.item.state = (this._prop.get_state() == IBus.PropState.CHECKED);
+        this.item.setShowDot(this.item.state);
+        this._activateId = this.item.connect('activate',
+                                             Lang.bind(this, this._onActivate));
 
         if (prop.get_visible()) {
-            this._item.actor.show();
+            this.item.actor.show();
         } else {
-            this._item.actor.hide();
+            this.item.actor.hide();
         }
     },
 
     _onActivate: function() {
-        this._item.state = true;
+        this.item.state = true;
         // Do not send property-activate to engine in case the event is
         // sent from engine.
         let do_emit = false;
@@ -371,47 +355,41 @@ RadioShellMenuItem.prototype = {
     propertyChanged: function() {
         this.setSensitive(this._prop.get_sensitive());
         if (this._prop.get_visible()) {
-            this._item.actor.show();
+            this.item.actor.show();
         } else {
-            this._item.actor.hide()
+            this.item.actor.hide()
         }
     },
 
-    getRaw: function() {
-        return this._item;
-    },
-
     show: function() {
-        this._item.actor.show();
+        this.item.actor.show();
     },
 
     hide: function() {
-        this._item.actor.hide();
+        this.item.actor.hide();
     },
 
     destroy: function() {
         this.disconnect(this._activateId);
-        this._item.destroy();
+        this.item.destroy();
     },
 
     setSensitive: function(sensitive) {
-        Common.actorSetSensitive(this._item.actor,
+        Common.actorSetSensitive(this.item.actor,
                                  sensitive,
-                                 this._item.label);
+                                 this.item.label);
     },
 
     setTooltipText: function(text) {
-        /* Probably we do not need tooltip for clutter. */
-        //this._item.actor.tooltip_text = text;
-        //this._item.actor.has_tooltip = true;
+        this.item.actor.set_tooltip_text(text);
     },
 
     setSubmenu: function(submenu) {
-        this._item.addActor(submenu.actor, null, null);
+        this.item.addActor(submenu.actor, null, null);
     },
 
     setLabel: function(label) {
-        this._item.label.set_text(label);
+        this.item.label.set_text(label);
     },
 
     setGroup: function(group) {
@@ -419,9 +397,9 @@ RadioShellMenuItem.prototype = {
     },
 
     setState: function(state) {
-        this._item.state = state;
+        this.item.state = state;
         let do_emit = false;
-        if (this._item.state) {
+        if (this.item.state) {
             if (this._prop.get_state() != IBus.PropState.CHECKED) {
                 do_emit = true;
             }
@@ -454,19 +432,15 @@ SeparatorShellMenuItem.prototype = {
 
     _init: function() {
         PropItem.PropItem.prototype._init.call(this, null);
-        this._item = new PopupMenu.PopupSeparatorMenuItem();
-    },
-
-    getRaw: function() {
-        return this._item;
+        this.item = new PopupMenu.PopupSeparatorMenuItem();
     },
 
     show: function() {
-        this._item.actor.show();
+        this.item.actor.show();
     },
 
     destroy: function() {
-        this._item.destroy();
+        this.item.destroy();
     }
 };
 

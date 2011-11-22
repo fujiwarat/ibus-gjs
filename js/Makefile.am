@@ -26,12 +26,12 @@ nobase_dist_js_DATA = 	\
 	ui/status/ibus/candidatePanel.js	\
 	ui/status/ibus/common.js	\
 	ui/status/ibus/ibusPanel.js	\
-	ui/status/ibus/imeDialog.js	\
 	ui/status/ibus/indicator.js	\
 	ui/status/ibus/languageBar.js	\
 	ui/status/ibus/panelMenu.js	\
 	ui/status/ibus/popupMenu.js	\
 	ui/status/ibus/propItem.js	\
+	ui/status/ibus/shellMenu.js \
 	ui/status/ibus/xkbLayout.js	\
 	$(NULL)
 

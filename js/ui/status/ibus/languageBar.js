@@ -21,9 +21,8 @@
 const IBus = imports.gi.IBus;
 const Lang = imports.lang;
 const Signals = imports.signals;
-const PopupMenu = imports.ui.popupMenu;
 
-const IMEDialog = imports.ui.status.ibus.imeDialog;
+const ShellMenu = imports.ui.status.ibus.shellMenu;
 
 function LanguageBar(indicator) {
     this._init(indicator);
@@ -105,38 +104,27 @@ LanguageBar.prototype = {
         let prop = null;
         let radioGroup = [];
 
-        if (props.get(0) != null) {
-            let item = new PopupMenu.PopupImageMenuItem(_("Input Method Menu"),
-                                                        'preferences-desktop');
-
-            this._indicator.menu.addMenuItem(item);
-            imeDialog = new IMEDialog.IMEDialog();
-            item.connect('activate',
-                         Lang.bind(this, function() {
-                                   imeDialog.open(global.get_current_time());}));
-        }
-
         for (let i = 0; props.get(i) != null; i++) {
             prop = props.get(i);
             if (prop.get_prop_type() == IBus.PropType.NORMAL) {
-                item = new IMEDialog.ImageShellMenuItem(imeDialog, prop);
+                item = new ShellMenu.ImageShellMenuItem(prop);
             }
             else if (prop.get_prop_type() == IBus.PropType.TOGGLE) {
-                item = new IMEDialog.ToggleShellMenuItem(imeDialog, prop);
+                item = new ShellMenu.CheckShellMenuItem(prop);
             }
             else if (prop.get_prop_type() == IBus.PropType.RADIO) {
-                item = new IMEDialog.RadioShellMenuItem(imeDialog, radioGroup, prop);
+                item = new ShellMenu.RadioShellMenuItem(radioGroup, prop);
                 radioGroup.push(item);
                 for (let j = 0; j < radioGroup.length; j++) {
                     radioGroup[j].setGroup(radioGroup);
                 }
             }
             else if (prop.get_prop_type() == IBus.PropType.SEPARATOR) {
-                item = new IMEDialog.SeparatorShellMenuItem();
+                item = new ShellMenu.SeparatorShellMenuItem();
                 radioGroup = [];
             }
             else if (prop.get_prop_type() == IBus.PropType.MENU) {
-                item = new IMEDialog.SubMenuItem(imeDialog, prop);
+                item = new ShellMenu.ShellMenu(prop);
             }
             else {
                 IBusException('Unknown property type = %d' % prop.get_prop_type());
@@ -151,10 +139,14 @@ LanguageBar.prototype = {
             }
 
             this._menuItems.push(item);
-            imeDialog.contentLayout.add(item.actor);
+            this._indicator.menu.addMenuItem(item.item);
             item.connect('property-activate',
                          Lang.bind(this, this._onItemPropertyActivate));
         }
+
+       if (props.get(0) != null) {
+           this._indicator.menu.addMenuItem(new ShellMenu.SeparatorShellMenuItem().item);
+       }
     }
 };
 
