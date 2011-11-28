@@ -46,12 +46,7 @@ function IBusPanel(bus, indicator) {
 IBusPanel.prototype = {
     _init: function(bus, indicator) {
         this._indicator = indicator;
-        this._setupPid = -1;
         this._useSysLayoutSystem = Config.HAVE_IBUS_XKB;
-        let prefix = Config.IBUS_PREFIX;
-        let dataDir = Config.IBUS_PKGDATADIR;
-        this._setupCmd = prefix + '/bin/ibus-setup';
-        this._isRestart = false;
         this._activeEngine = null;
         this._duplicatedEngineList = [];
 
@@ -285,11 +280,6 @@ IBusPanel.prototype = {
     },
 
     _createShellMenuForPopup: function() {
-        let item = new PopupMenu.PopupImageMenuItem(_("Input Method Preferences"),
-                                                    'preferences-desktop');
-        item.connect('activate',
-                     Lang.bind(this, this._preferencesItemShellActivateCB));
-        this._indicator.menu.addMenuItem(item);
         this._indicator.menu.addSettingsAction(_("Region and Language Settings"),
                                                'gnome-region-panel.desktop');
         this._indicator.menu.addAction(_("Show Keyboard Layout"),
@@ -301,14 +291,6 @@ IBusPanel.prototype = {
             }
             Util.spawn(['gkbd-keyboard-display', '-g', String(xkbGroupID + 1)]);
         }));
-        item = new PopupMenu.PopupImageMenuItem(_("Restart"), 'reload');
-        item.connect('activate',
-                     Lang.bind(this, this._restartItemShellActivateCB));
-        this._indicator.menu.addMenuItem(item);
-        item = new PopupMenu.PopupImageMenuItem(_("Quit"), 'exit');
-        item.connect('activate',
-                     Lang.bind(this, this._quitItemShellActivateCB));
-        this._indicator.menu.addMenuItem(item);
     },
 
     _onLanguageBarPropertyActivate: function(widget, prop_name, prop_state) {
@@ -559,42 +541,6 @@ IBusPanel.prototype = {
 
     _imMenuItemShellActivateCB: function(item, event) {
         this._imMenuItemStatusActivateCB(item);
-    },
-
-    _childSetupWatchCB: function(pid, status, data) {
-        if (this._setupPid == pid) {
-            this._setupPid = -1;
-        }
-    },
-
-    _preferencesItemShellActivateCB: function(item, event, user_data) {
-        if (this._setupPid != -1) {
-            try {
-                Util.trySpawnCommandLine('kill -10 ' + this._setupPid.toString());
-                return;
-
-            } catch (e) {
-                this._setupPid = -1;
-            }
-        }
-        let pid = GLib.spawn_async(null,
-                                   [this._setupCmd, 'ibus-setup'],
-                                   null,
-                                   GLib.SpawnFlags.DO_NOT_REAP_CHILD, null,
-                                   null)[1];
-        this._setupPid = pid;
-        GLib.child_watch_add(0, this._setupPid,
-                             Lang.bind(this, this._childSetupWatchCB),
-                             null);
-    },
-
-    _restartItemShellActivateCB: function(item, event, user_data) {
-        this._isRestart = true;
-        this._bus.exit(true);
-    },
-
-    _quitItemShellActivateCB: function(item, event, user_data) {
-        this._bus.exit(false);
     },
 
     _setIMIcon: function(iconName, label) {
@@ -1154,12 +1100,7 @@ IBusPanel.prototype = {
         this._panel.property_hide(propName);
     },
 
-    isRestart: function() {
-        return this._isRestart;
-    },
-
     restart: function(bus) {
         this._initBus(bus);
-        this._isRestart = false;
     }
 };

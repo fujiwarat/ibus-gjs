@@ -106,6 +106,12 @@ LanguageBar.prototype = {
 
         for (let i = 0; props.get(i) != null; i++) {
             prop = props.get(i);
+            if (prop.get_key().toLowerCase() == 'setup' &&
+                prop.get_prop_type() == IBus.PropType.NORMAL) {
+                // engine preference is not shown here.
+                // Users will access it from gnome-control-center.
+                continue;
+            }
             if (prop.get_prop_type() == IBus.PropType.NORMAL) {
                 item = new ShellMenu.ImageShellMenuItem(prop);
             }

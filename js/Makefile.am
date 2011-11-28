@@ -46,9 +46,7 @@ ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
 
 ui/status/ibus/ibusPanel.js: ui/status/ibus/ibusPanel.js.in
 	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
-	    sed -e "s|Config.IBUS_PREFIX|'$(IBUS_PREFIX)'|g" \
-	        -e "s|Config.IBUS_PKGDATADIR|'$(IBUS_PKGDATADIR)'|g" \
-	        -e "s|Config.HAVE_IBUS_XKB|$(HAVE_IBUS_XKB)|g" \
+	    sed -e "s|Config.HAVE_IBUS_XKB|$(HAVE_IBUS_XKB)|g" \
 	    $< > $@; \
 	else \
 	    cp $< $@; \
