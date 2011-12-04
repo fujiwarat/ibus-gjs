@@ -9,10 +9,6 @@ const GJS_VERSION = '@GJS_VERSION@';
 const HAVE_BLUETOOTH = @HAVE_BLUETOOTH@;
 /* true if ibus-xkb is available, false otherwise */
 const HAVE_IBUS_XKB = @HAVE_IBUS_XKB@;
-/* The path of IBus prefix */
-const IBUS_PREFIX = '@IBUS_PREFIX@';
-/* The path of IBus pkgdatadir */
-const IBUS_PKGDATADIR = '@IBUS_PKGDATADIR@';
 /* The path of ibus-xkb */
 const IBUS_XKB = '@IBUS_XKB@';
 

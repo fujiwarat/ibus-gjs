@@ -93,10 +93,6 @@ UIApplication.prototype = {
 
     _disconnectCB: function() {
         this._hasInited = false;
-        if (this._panel.isRestart()) {
-            this.emit('restart');
-            return;
-        }
         this.emit('disconnected');
     },
 
@@ -130,22 +126,6 @@ UIApplication.prototype = {
 
     hasInited: function() {
         return this._hasInited;
-    },
-
-    restart: function() {
-        if (this._bus) {
-            this._bus.destroy();
-        }
-        this._bus = new IBus.Bus();
-
-        this._bus.connect('connected',
-                          Lang.bind(this, this._connectCB));
-        this._bus.connect('disconnected',
-                          Lang.bind(this, this._disconnectCB));
-        if (this._bus.is_connected() == false) {
-            return;
-        }
-        this._connectCB();
     }
 };
 
@@ -171,8 +151,6 @@ Indicator.prototype = {
                                     Lang.bind(this, this._connectCB));
         this._uiapplication.connect('disconnected',
                                     Lang.bind(this, this._disconnectCB));
-        this._uiapplication.connect('restart',
-                                    Lang.bind(this, this._restartCB));
         this._uiapplication.connect('restart-connected',
                                     Lang.bind(this, this._restartConnectedCB));
         this._uiapplication.connect('name-lost',
@@ -188,12 +166,6 @@ Indicator.prototype = {
         log('Got disconnected signal from DBus');
         this.menu.close();
         this.actor.hide();
-    },
-
-    _restartCB: function() {
-        log('Restarting ibus panel');
-        this.menu.close();
-        this._uiapplication.restart();
     },
 
     _restartConnectedCB: function() {
