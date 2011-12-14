@@ -26,6 +26,7 @@ EXTRA_DIST =		\
 	autogen.sh	\
 	data/theme/gnome-shell.css \
 	ibus-gjs.spec.in \
+	user.patch \
 	$(NULL)
 
 # These are files checked into Git that we don't want to distribute

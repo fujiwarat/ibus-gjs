@@ -1,0 +1,106 @@
+--- ibus-indicator@example.com/extension.js.orig
++++ ibus-indicator@example.com/extension.js
+@@ -1,7 +1,8 @@
+ /* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
+ 
+ const Main = imports.ui.main;
+-const Indicator = imports.ui.status.ibus.indicator;
++const Extension = imports.ui.extensionSystem.extensions['ibus-indicator@example.com'];
++const Indicator = Extension.ibus.indicator;
+ 
+ let indicator = null;
+ 
+--- ibus-indicator@example.com/ibus/candidatePanel.js.orig
++++ ibus-indicator@example.com/ibus/candidatePanel.js
+@@ -30,7 +30,8 @@ const Main = imports.ui.main;
+ const Shell = imports.gi.Shell;
+ const BoxPointer = imports.ui.boxpointer;
+ 
+-const Common = imports.ui.status.ibus.common;
++const Extension = imports.ui.extensionSystem.extensions['ibus-indicator@example.com'];
++const Common = Extension.ibus.common;
+ 
+ const topLabelStyle = 'padding: .1em 0em';
+ const candidateLabelStyle = 'padding: .1em 0em .1em 0em';
+--- ibus-indicator@example.com/ibus/ibusPanel.js.orig
++++ ibus-indicator@example.com/ibus/ibusPanel.js
+@@ -30,11 +30,12 @@ const Main = imports.ui.main;
+ const Util = imports.misc.util;
+ const Config = imports.misc.config;
+ 
+-const CandidatePanel = imports.ui.status.ibus.candidatePanel;
+-const LanguageBar = imports.ui.status.ibus.languageBar;
+-const IPopupMenu = imports.ui.status.ibus.popupMenu;
+-const XKBLayout = imports.ui.status.ibus.xkbLayout;
+-const Common = imports.ui.status.ibus.common;
++const Extension = imports.ui.extensionSystem.extensions['ibus-indicator@example.com'];
++const CandidatePanel = Extension.ibus.candidatePanel;
++const LanguageBar = Extension.ibus.languageBar;
++const IPopupMenu = Extension.ibus.popupMenu;
++const XKBLayout = Extension.ibus.xkbLayout;
++const Common = Extension.ibus.common;
+ 
+ const ICON_ENGINE = 'ibus-engine';
+ 
+--- ibus-indicator@example.com/ibus/indicator.js.orig
++++ ibus-indicator@example.com/ibus/indicator.js
+@@ -24,8 +24,9 @@ const DBus = imports.dbus;
+ const Lang = imports.lang;
+ const Signals = imports.signals;
+ 
+-const PanelMenu = imports.ui.status.ibus.panelMenu;
+-const IBusPanel = imports.ui.status.ibus.ibusPanel;
++const Extension = imports.ui.extensionSystem.extensions['ibus-indicator@example.com'];
++const PanelMenu = Extension.ibus.panelMenu;
++const IBusPanel = Extension.ibus.ibusPanel;
+ 
+ 
+ function UIApplication(indicator) {
+--- ibus-indicator@example.com/ibus/languageBar.js.orig
++++ ibus-indicator@example.com/ibus/languageBar.js
+@@ -22,7 +22,8 @@ const IBus = imports.gi.IBus;
+ const Lang = imports.lang;
+ const Signals = imports.signals;
+ 
+-const ShellMenu = imports.ui.status.ibus.shellMenu;
++const Extension = imports.ui.extensionSystem.extensions['ibus-indicator@example.com'];
++const ShellMenu = Extension.ibus.shellMenu;
+ 
+ function LanguageBar(indicator) {
+     this._init(indicator);
+--- ibus-indicator@example.com/ibus/shellMenu.js.orig
++++ ibus-indicator@example.com/ibus/shellMenu.js
+@@ -25,8 +25,9 @@ const Signals = imports.signals;
+ const PopupMenu = imports.ui.popupMenu;
+ const Main = imports.ui.main;
+ 
+-const PropItem = imports.ui.status.ibus.propItem;
+-const Common = imports.ui.status.ibus.common;
++const Extension = imports.ui.extensionSystem.extensions['ibus-indicator@example.com'];
++const PropItem = Extension.ibus.propItem;
++const Common = Extension.ibus.common;
+ 
+ function ShellMenu(prop) {
+     this._init(prop);
+--- ibus-indicator@example.com/ibus/ibusPanel.js.orig
++++ ibus-indicator@example.com/ibus/ibusPanel.js
+@@ -47,7 +47,7 @@ function IBusPanel(bus, indicator) {
+ IBusPanel.prototype = {
+     _init: function(bus, indicator) {
+         this._indicator = indicator;
+-        this._useSysLayoutSystem = true;
++        this._useSysLayoutSystem = false;
+         this._activeEngine = null;
+         this._duplicatedEngineList = [];
+ 
+--- ibus-indicator@example.com/ibus/xkbLayout.js.orig
++++ ibus-indicator@example.com/ibus/xkbLayout.js
+@@ -40,7 +40,7 @@ XKBLayout.prototype = {
+     _init: function(config) {
+         this._config = null;
+         this._command = '/usr/libexec/ibus-xkb';
+-        this._useXkb = true;
++        this._useXkb = false;
+         this._useXmodmap = true;
+         this._xkbPid = -1;
+         this._xmodmapPid = -1;
