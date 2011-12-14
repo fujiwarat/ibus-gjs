@@ -3,5 +3,6 @@
  "uuid": "ibus-indicator@example.com",
  "name": "Input-Method Status Indicator",
  "description": "Add a system status menu for input-methods using IBus",
- "url": "https://github.com/fujiwarat/ibus-gjs"
+ "url": "https://github.com/fujiwarat/ibus-gjs",
+ "version": 3
 }

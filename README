@@ -1,2 +1,86 @@
 ibus-gjs
 It is a GNOME-Shell GJS Plugin for IBus
+The ibus-gjs works with ibus on gnome-shell.
+So you need to install gnome-shell and ibus and enable 3D accelerator with
+your graphics card to launch gnome-shell.
+
+
+Build and install from source
+=============================
+
+The build make & make install expect to install the files into system
+directories since we'd try to integrate this module into upstream gnome-shell.
+ - js files are installed in 
+   /usr/share/gnome-shell/js/ui/status/ibus
+ - extension files are installed in
+   /usr/share/gnome-shell/extensions/ibus-indicator@example.com
+
+Need to enable the ibus extension by manual after you install ibus-gjs:
+
+Run gnome-tweak-tool on gnome-shell and enable the extension of
+"Input-Method Status Indicator"
+
+or
+
+Set a gsetting value by manual:
+% gsettings get org.gnome.shell enabled-extensions
+[]
+% gsettings set org.gnome.shell enabled-extensions "['ibus-indicator@example.com']"
+% gsettings get org.gnome.shell enabled-extensions
+['ibus-indicator@example.com']
+
+
+
+Download and install from web site
+==================================
+
+You can install ibus-gjs with the user privilege.
+You need to uninstall the ibus-gjs if you installed it.
+1. Run gnome-shell
+2. Enable "Input-Method Status Indicator" below
+https://extensions.gnome.org/extension/68/input-method-status-indicator/
+
+The community version disables an ibus xkb feature because the Fedora
+specific feature is not upstreamed in ibus yet.
+You could see that user.patch disables XKB in ibusPanel.js and xkbLayout.js.
+So if you would use this on Fedora, you could enable XKB to modify
+ibusPanel.js and xkbLayout.js by manual.
+
+Actually the web site dowloads the ibjs-gjs files under the user directory
+and enables the gnome.shell gsettings above.
+
+% cd $HOME
+% mkdir -p .local/share/gnome-shell/extensions/ibus-indicator@example.com
+% cp /usr/share/gnome-shell/extensions/ibus-indicator@example.com/* \
+  .local/share/gnome-shell/extensions/ibus-indicator@example.com/.
+% mkdir .local/share/gnome-shell/extensions/ibus-indicator@example.com/ibus
+% cp /usr/share/gnome-shell/js/ui/status/ibus/* \
+  .local/share/gnome-shell/extensions/ibus-indicator@example.com/ibus/.
+% cd .local/share/gnome-shell/extensions/ibus-indicator@example.com
+% patch -p1 < user.patch
+
+(To upload the files in extensions.gnome.org,
+bump the version in metadata.json and
+% cd ibus-indicator@example.com
+% zip -r ibus-indicator@example.com.zip \
+  extension.js ibus metadata.json stylesheet.css
+)
+
+
+Installation failure
+====================
+
+The gnome-shell extension module has the version information of gnome-shell
+and gjs, and gnome-shell checks the versions.
+If the versions are not matched, the gnome-shell ibus extension is not enabled.
+You could check if the versions are matched by manual.
+
+% rpm -q gnome-shell
+gnome-shell-3.2.1-1.fc16.x86_64
+% rpm -q gjs
+gjs-1.30.0-1.fc16.x86_64
+% egrep 'shell-version|js-version' \
+  /usr/share/gnome-shell/extensions/ibus-indicator@example.com/metadata.json
+{"shell-version": ["3.2"],
+ "js-version": ["1.30"],
+
