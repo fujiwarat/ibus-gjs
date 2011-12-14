@@ -162,14 +162,14 @@ IBusPanel.prototype = {
             value = 'default';
         }
         if (value != 'default') {
+            this._xkblayout.setDefaultLayout(value);
             if (value.indexOf('(') >= 0) {
-                this._defaultLayout = value.split('(')[0];
-                this._defaultModel = value.split('(')[1].split(')')[0];
+                [this._defaultLayout, this._defaultModel] =
+                    this._xkblayout.getDefaultLayout();
             } else {
                 this._defaultLayout = value;
                 this._defaultModel = null;
             }
-            this._xkblayout.setDefaultLayout(value);
         }
         value = this._config.get_value(
             'general',
