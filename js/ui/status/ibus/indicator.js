@@ -1,8 +1,8 @@
-/* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
+// -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /*
- * Copyright 2011 Red Hat, Inc.
- * Copyright 2011 Peng Huang <shawn.p.huang@gmail.com>
- * Copyright 2011 Takao Fujiwara <tfujiwar@redhat.com>
+ * Copyright 2012 Red Hat, Inc.
+ * Copyright 2012 Peng Huang <shawn.p.huang@gmail.com>
+ * Copyright 2012 Takao Fujiwara <tfujiwar@redhat.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -43,7 +43,6 @@ UIApplication.prototype = {
 
         if (this._bus.is_connected() == false) {
             log('ibus-daemon is not running');
-            return;
         }
 
         this._initPanel(false);
@@ -57,21 +56,23 @@ UIApplication.prototype = {
             this._bus.connect('connected',
                               Lang.bind(this, this._connectCB));
         }
-        let matchRule = "type='signal',\
+
+        if (this._bus.is_connected()) {
+            let matchRule = "type='signal',\
+                            sender='org.freedesktop.IBus',\
+                            path='/org/freedesktop/IBus'";
+            this._bus.add_match(matchRule);
+            matchRule = "type='signal',\
                         sender='org.freedesktop.IBus',\
-                        path='/org/freedesktop/IBus'";
-        this._bus.add_match(matchRule);
-        matchRule = "type='signal',\
-                    sender='org.freedesktop.IBus',\
-                    member='NameLost',\
-                    arg0='" + IBus.SERVICE_PANEL + "'";
-        this._bus.add_match(matchRule);
-        this._bus.request_name(IBus.SERVICE_PANEL,
-                               IBus.BusNameFlag.ALLOW_REPLACEMENT |
-                               IBus.BusNameFlag.REPLACE_EXISTING);
-        if (this._bus.is_connected() == false) {
-            log('RequestName ' + IBus.SERVICE_PANEL + ' is time out.');
-            return;
+                        member='NameLost',\
+                        arg0='" + IBus.SERVICE_PANEL + "'";
+            this._bus.add_match(matchRule);
+            this._bus.request_name(IBus.SERVICE_PANEL,
+                                   IBus.BusNameFlag.ALLOW_REPLACEMENT |
+                                   IBus.BusNameFlag.REPLACE_EXISTING);
+            if (isRestart && this._bus.is_connected() == false) {
+                log('RequestName ' + IBus.SERVICE_PANEL + ' is time out.');
+            }
         }
 
         if (isRestart) {
@@ -80,15 +81,17 @@ UIApplication.prototype = {
             this._panel = new IBusPanel.IBusPanel(this._bus, this._indicator);
         }
 
-        this._bus.get_connection().signal_subscribe('org.freedesktop.DBus',
-                                                    'org.freedesktop.DBus',
-                                                    'NameLost',
-                                                    '/org/freedesktop/DBus',
-                                                    IBus.SERVICE_PANEL,
-                                                    Gio.DBusSignalFlags.NONE,
-                                                    Lang.bind(this, this._nameLostCB),
-                                                    null,
-                                                    null);
+        if (this._bus.is_connected()) {
+            this._bus.get_connection().signal_subscribe('org.freedesktop.DBus',
+                                                        'org.freedesktop.DBus',
+                                                        'NameLost',
+                                                        '/org/freedesktop/DBus',
+                                                        IBus.SERVICE_PANEL,
+                                                        Gio.DBusSignalFlags.NONE,
+                                                        Lang.bind(this, this._nameLostCB),
+                                                        null,
+                                                        null);
+        }
     },
 
     _disconnectCB: function() {

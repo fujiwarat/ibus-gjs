@@ -1,4 +1,4 @@
-{"shell-version": ["@GNOME_SHELL_VERSION@"],
+{"shell-version": ["@GNOME_SHELL_VERSION@", "3.2"],
  "js-version": ["@GJS_VERSION@"],
  "uuid": "ibus-indicator@example.com",
  "name": "Input-Method Status Indicator",

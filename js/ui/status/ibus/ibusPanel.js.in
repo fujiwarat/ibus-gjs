@@ -1,8 +1,8 @@
-/* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
+// -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /*
- * Copyright 2011 Red Hat, Inc.
- * Copyright 2011 Peng Huang <shawn.p.huang@gmail.com>
- * Copyright 2011 Takao Fujiwara <tfujiwar@redhat.com>
+ * Copyright 2012 Red Hat, Inc.
+ * Copyright 2012 Peng Huang <shawn.p.huang@gmail.com>
+ * Copyright 2012 Takao Fujiwara <tfujiwar@redhat.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -20,24 +20,29 @@
 
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
+const Gkbd = imports.gi.Gkbd;
 const IBus = imports.gi.IBus;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
+const Meta = imports.gi.Meta;
 const Lang = imports.lang;
 const PopupMenu = imports.ui.popupMenu;
-const Lightbox = imports.ui.lightbox;
 const Main = imports.ui.main;
 const Util = imports.misc.util;
 const Config = imports.misc.config;
 
 const CandidatePanel = imports.ui.status.ibus.candidatePanel;
-const LanguageBar = imports.ui.status.ibus.languageBar;
+const PropertyManager = imports.ui.status.ibus.propertyManager;
 const IPopupMenu = imports.ui.status.ibus.popupMenu;
 const XKBLayout = imports.ui.status.ibus.xkbLayout;
+const Switcher = imports.ui.status.ibus.switcher;
 const Common = imports.ui.status.ibus.common;
 
 const ICON_ENGINE = 'ibus-engine';
-
+const SCHEMA_HOTKEY = 'org.freedesktop.ibus.general.hotkey';
+const SECTION_HOTKEY = 'general/hotkey';
+const KEY_TRIGGER = 'trigger-accel';
+const LAYOUTS_MAX_LENGTH = 4;
 
 function IBusPanel(bus, indicator) {
     this._init(bus, indicator);
@@ -46,17 +51,24 @@ function IBusPanel(bus, indicator) {
 IBusPanel.prototype = {
     _init: function(bus, indicator) {
         this._indicator = indicator;
-        this._useSysLayoutSystem = Config.HAVE_IBUS_XKB;
+        this._propertyManager = null;
         this._activeEngine = null;
         this._duplicatedEngineList = [];
+        this._engines = [];
+        this._layouts = [];
+        this._variants = [];
+        this._gkbdlayout = null;
+        this._fallbackLockID = -1;
+        this._changedXkbOption = false;
 
         if (!this._initBus(bus)) {
             return;
         }
 
-        this._languageBar = new LanguageBar.LanguageBar(indicator);
-        this._languageBar.connect('property-activate',
-                                  Lang.bind(this, this._onLanguageBarPropertyActivate));
+        this._propertyManager = new PropertyManager.PropertyManager();
+        this._propertyManager.connect('property-activate',
+                                      Lang.bind(this, this._onPropertyManagerPropertyActivate));
+
         this._candidatePanel = new CandidatePanel.CandidatePanel();
         this._candidatePanel.connect('cursor-up',
                                      Lang.bind(this, function(widget) {
@@ -75,118 +87,66 @@ IBusPanel.prototype = {
                                                function(widget, index, button, state) {
                                          this.candidateClicked(index, button, state);}));
 
-        this._indicator.setIcon(XKBLayout.ICON_KEYBOARD);
+        this.stateChanged();
         this._indicator.actor.connect('button-press-event',
                                       Lang.bind(this, this._onShellPanelButtonPressEvent));
 
-        this._configLoadLookupTableOrientation();
+        if (this._config != null) {
+            this._configLoadLookupTableOrientation();
+        }
     },
 
     _initBus: function(bus) {
         this._bus = bus;
         this._focusIC = null;
 
-        // connect bus signal
-        this._config = this._bus.get_config();
-        if (this._config == null) {
-            log('Could not get ibus-gconf.');
-            return false;
+        this._config = null;
+        if (this._bus.is_connected()) {
+            this._config = this._bus.get_config();
+            this._initSignals();
+
+            if (this._config == null) {
+                log('Could not get ibus-dconf.');
+                return false;
+            }
+
+            this._config.connect('value-changed',
+                                 Lang.bind(this, this._configValueChangedCB));
+            //this._config.connect('reloaded', this._configReloadedCB);
+
+            // connect bus signal
+            this._bus.get_connection().signal_subscribe('org.freedesktop.DBus',
+                                                        'org.freedesktop.DBus',
+                                                        'NameOwnerChanged',
+                                                        '/org/freedesktop/DBus',
+                                                        IBus.SERVICE_PANEL,
+                                                        Gio.DBusSignalFlags.NONE,
+                                                        Lang.bind(this, this._nameOwnerChangedCB),
+                                                        null,
+                                                        null);
         }
-
-        this._initSignals();
-
-        this._config.connect('value-changed',
-                             Lang.bind(this, this._configValueChangedCB));
-        // this._config.connect('reloaded', this._configReloadedCB);
-
-        this._bus.get_connection().signal_subscribe('org.freedesktop.DBus',
-                                                    'org.freedesktop.DBus',
-                                                    'NameOwnerChanged',
-                                                    '/org/freedesktop/DBus',
-                                                    IBus.SERVICE_PANEL,
-                                                    Gio.DBusSignalFlags.NONE,
-                                                    Lang.bind(this, this._nameOwnerChangedCB),
-                                                    null,
-                                                    null);
 
         // init xkb
-        this._useSysLayoutUser = true;
-        this._defaultLayout = 'default';
-        this._defaultModel = 'default';
-        this._defaultOption = 'default';
-        this._useBridgeHotkeySystem = false;
-        try {
-            this._useBridgeHotkeySystem = IBus.use_bridge_hotkey();
-        } catch (e) {
-            // This feature is not available.
-        }
-        this._useBridgeHotkeyUser = true;
-        try {
-            this._useBridgeHotkeyUser = this._config.get_value(
-                'general/hotkey',
-                'use_bridge_hotkey',
-                GLib.Variant.new_boolean(true)).get_boolean();
-        } catch (e) {
-            // This feature is not available.
-        }
-        this._defaultBridgeEngineName = XKBLayout.DEFAULT_BRIDGE_ENGINE_NAME;
-        try {
-            this._defaultBridgeEngineName = IBus.get_default_bridge_engine_name();
-        } catch (e) {
-            // This feature is not available.
-        }
-        this._disabledEngines = [];
-        this._disabledEnginesID = -1;
-        this._disabledEnginesPrevID = -1;
-        this._disabledEnginesSwapped = 0;
-        this._xkbGroupID = -1;
-
-        this._xkblayout = new XKBLayout.XKBLayout(this._config);
-        if (!this._useSysLayoutSystem) {
-            this._useSysLayoutUser = false;
-            return true;
-        }
-        let useXkb = this._config.get_value(
-            'general',
-            'use_system_keyboard_layout',
-            GLib.Variant.new_boolean(false)).get_boolean();
-        if (!useXkb) {
-            this._useSysLayoutUser = false;
-            this._xkblayout.useXkb(false);
-        }
-        let value = this._config.get_value(
-            'general',
-            'system_keyboard_layout',
-            GLib.Variant.new_string('')).dup_string()[0];
-        if (value == '') {
-            value = 'default';
-        }
-        if (value != 'default') {
-            this._xkblayout.setDefaultLayout(value);
-            if (value.indexOf('(') >= 0) {
-                [this._defaultLayout, this._defaultModel] =
-                    this._xkblayout.getDefaultLayout();
-            } else {
-                this._defaultLayout = value;
-                this._defaultModel = null;
-            }
-        }
-        value = this._config.get_value(
-            'general',
-            'system_keyboard_option',
-            GLib.Variant.new_string('')).dup_string()[0];
-        if (value == '') {
-            value = 'default';
-        }
-        if (value != 'default') {
-            this._xkblayout.setDefaultOption(value);
+        this._initEnginesOrder();
+        if (this._config != null) {
+            this._updateEngines(this._config.get_value('general', 'preload_engines', []),
+                                this._config.get_value('general', 'engines_order', []));
+        } else {
+            this._switchEngine(0, true);
         }
 
+        global.display.add_keybinding(KEY_TRIGGER,
+                                      SCHEMA_HOTKEY,
+                                      Meta.KeyBindingFlags.REVERSES,
+                                      Lang.bind(this, this._handleEngineSwitch),
+                                      1,
+                                      null);
         return true;
     },
 
     _initSignals: function() {
-        this._panel = IBus.PanelService.new(this._bus.get_connection());
+        this._panel = new IBus.PanelService({ connection: this._bus.get_connection(),
+                                              object_path: IBus.PATH_PANEL });
         this._panel.connect('set-cursor-location',
                             Lang.bind(this, this.setCursorLocation));
         this._panel.connect('update-preedit-text',
@@ -223,18 +183,334 @@ IBusPanel.prototype = {
                             Lang.bind(this, this.stateChanged));
     },
 
-    _useSysLayout: function() {
-        if (!this._useSysLayoutSystem) {
-            return false;
-        }
-        return this._useSysLayoutUser;
+    _initEnginesOrder: function() {
+        this._xkblayout = new XKBLayout.XKBLayout(this._config);
+        this._initGkbd();
+
+        this._updateXkbEngines();
+
+        return true;
     },
 
-    _useBridgeHotkey: function() {
-        if (!this._useBridgeHotkeySystem) {
+    _initGkbd: function() {
+        this._gkbdlayout = Gkbd.Configuration.get();
+        this._gkbdlayout.connect('changed', Lang.bind(this, this._syncGroup));
+        GLib.test_timer_start();
+        this._gkbdlayout.start_listen();
+    },
+
+    _updateXkbEngines: function() {
+        let varLayout = this._xkblayout.getLayout();
+        let varVariant = this._xkblayout.getVariant();
+        if (varLayout == '') {
+            return;
+        }
+
+        this._layouts = varLayout.split(',');
+        this._variants = varVariant.split(',');
+
+        let registry = new IBus.XKBConfigRegistry();
+        let varXkbEngineNames = [];
+        let descriptions = this._gkbdlayout.get_short_group_names();
+        let engines = [];
+
+        for (let i = 0; i < this._layouts.length; i++) {
+            let name = this._layouts[i];
+            let langs = null;
+            let lang = null;
+            let variant = null;
+            if (i < this._variants.length && this._variants[i] != "") {
+                name += ':' + this._variants[i];
+                variant = this._variants[i];
+                let layout = name + '(' + this._variants[i] + ')';
+                langs = registry.layout_lang_get_langs(layout);
+                if (langs.length != 0) {
+                    lang = langs[0];
+                }
+            } else {
+                name += ':';
+            }
+
+            if (lang == null) {
+                langs = registry.layout_lang_get_langs(this._layouts[i]);
+                if (langs.lenth != 0) {
+                    lang = langs[0];
+                }
+            }
+            varXkbEngineNames.push('xkb:' + name + ':' + lang);
+            if (this._config == null) {
+                let name = 'xkb:' + name + ':' + lang;
+                let description = null;
+                if (i < descriptions.length && descriptions[i] != "") {
+                    description = descriptions[i];
+                }
+                var engine = XKBLayout.engineDescNew(lang,
+                                                     this._layouts[i],
+                                                     null,
+                                                     variant,
+                                                     description,
+                                                     name);
+                engines.push(engine);
+            }
+        }
+
+        if (this._config == null) {
+            this._engines = this._checkEnginesHaveDuplicatedLang(engines);
+            let i = this._gkbdlayout.get_current_group();
+            let engine = this._engines[i];
+            for (let j = i; j > 0; j--) {
+                this._engines[j] = this._engines[j - 1];
+            }
+            this._engines[0] = engine;
+            return;
+        }
+
+        let varEngines = this._config.get_value('general', 'preload_engines', null);
+        let engineNames = (varEngines != null) ? varEngines.dup_strv() : [];
+        let isUpdatedEngineNames = false;
+
+        for (let i = 0; i < varXkbEngineNames.length; i++) {
+            let name = varXkbEngineNames[i];
+            let j = 0;
+
+            for (j = 0; j < engineNames.length; j++) {
+                if (name == engineNames[j]) {
+                    break;
+                }
+            }
+            if (j < engineNames.length) {
+                continue;
+            }
+
+            let isUpdatedEngineNames = true;
+            engineNames.push(name);
+        }
+
+        if (isUpdatedEngineNames) {
+            this._config.set_value('general', 'preload_engines',
+                                   GLib.Variant.new_strv(engineNames));
+        }
+
+        let varOrder = this._config.get_value('general', 'engines_order', null);
+        let orderNames = (varOrder != null) ? varOrder.dup_strv() : [];
+        let isUpdatedOrderNames = false;
+
+        for (let i = 0; i < varXkbEngineNames.length; i++) {
+            let name = varXkbEngineNames[i];
+            let j = 0;
+
+            for (j = 0; j < orderNames.length; j++) {
+                if (name == orderNames[j]) {
+                    break;
+                }
+            }
+            if (j < orderNames.length) {
+                continue;
+            }
+
+            orderNames.push(name);
+            isUpdatedOrderNames = true;
+        }
+
+        if (isUpdatedOrderNames) {
+            this._config.set_value('general', 'engines_order',
+                                   GLib.Variant.new_strv(orderNames));
+        }
+    },
+
+    _updateEngines: function(varEngines, varOrder) {
+        let engineNames = null;
+        if (varEngines != null) {
+            engineNames = varEngines.dup_strv();
+        }
+        if (engineNames == null || engineNames.length == 0) {
+            engineNames = ['xkb:us::eng'];
+        }
+
+        let orderNames = (varOrder != null) ? varOrder.dup_strv() : [];
+        let names = [];
+
+        for (let i = 0; i < orderNames.length; i++) {
+            let name = orderNames[i];
+            for (let j = 0; j < engineNames.length; j++) {
+                if (name == engineNames[j]) {
+                    names.push(name);
+                    break;
+                }
+            }
+        }
+
+        for (let i = 0; i < engineNames.length; i++) {
+            let name = engineNames[i];
+            let j = 0;
+
+            for (j = 0; j < names.length; j++) {
+                if (name == names[j]) {
+                    break;
+                }
+            }
+            if (j < names.length) {
+                continue;
+            }
+
+            names.push(name);
+        }
+
+        let engines = this._bus.get_engines_by_names(names);
+
+        if (this._engines.length == 0) {
+            this._engines = this._checkEnginesHaveDuplicatedLang(engines);
+            this._switchEngine(0, true);
+        } else {
+            let currentEngine = this._engines[0];
+            this._engines = this._checkEnginesHaveDuplicatedLang(engines);
+            for (let i = 0; i < engines.length; i++) {
+                if (currentEngine.get_name() == engines[i].get_name()) {
+                    this._switchEngine(i);
+                    return;
+                }
+            }
+            this._switchEngine(0, true);
+        }
+    },
+
+    _syncGroup: function() {
+        /* The callback is called four times after setLayout is called
+         * so check the elapsed and take the first signal only. */
+        let elapsed = GLib.test_timer_elapsed();
+        if (elapsed < 1.0 && elapsed > 0.0) {
+            return;
+        }
+
+        if (this._fallbackLockID != -1) {
+            /* Call lock_group only when setLayout is called. */
+            this._gkbdlayout.lock_group(this._fallbackLockID);
+            this._fallbackLockID = -1;
+        } else {
+            /* Reset default layout when gnome-control-center is called. */
+            this._xkblayout.resetLayout();
+        }
+
+        this._updateXkbEngines();
+        GLib.test_timer_start();
+    },
+
+    _switchEngine: function(i, force) {
+        if (force == undefined) {
+            force = false;
+        }
+        if (i < 0 || i >= this._engines.length) {
+            assert();
+        }
+
+        // Do not need switch
+        if (i == 0 && !force) {
+            return;
+        }
+
+        // Move the target engine to the first place.
+        let engine = this._engines[i];
+        for (let j = i; j > 0; j--) {
+            this._engines[j] = this._engines[j - 1];
+        }
+        this._engines[0] = engine;
+
+        if (this._bus.is_connected() &&
+            !this._bus.set_global_engine(engine.get_name())) {
+            global.log('Switch engine to ' + engine.get_name() + ' failed.');
+            return;
+        }
+        this._setIMIcon(engine.icon, this.getIconTextFromEngine(engine));
+
+        // set xkb layout
+        this._setLayout(engine.get_layout());
+
+        if (this._config != null) {
+            let names = [];
+            for (let j = 0; j < this._engines.length; j++) {
+                names.push(this._engines[j].get_name());
+            }
+            this._config.set_value('general', 'engines_order',
+                                   GLib.Variant.new_strv(names));
+        }
+    },
+
+    _setLayout: function(layout) {
+        if (layout == 'default' || layout == null) {
+            return;
+        }
+
+        if (this._xkblayout == null) {
+            this._initEnginesOrder();
+        }
+
+        if (this._setGkbdLayout(layout)) {
+            return;
+        }
+
+        this._setXkbGroupLayout(layout);
+        return;
+    },
+
+    _setGkbdLayout: function(layout) {
+        /* If a previous ibus engine changed XKB options, need to set the
+         * default XKB option. */
+        if (this._changedXkbOption) {
+            this._changedXkbOption = false;
             return false;
         }
-        return this._useBridgeHotkeyUser;
+
+        let gkbdLen = this._gkbdlayout.get_group_names().length;
+        for (let i = 0; i < this._layouts.length && i < gkbdLen; i++) {
+            let sysLayout = this._layouts[i];
+            if (i < this._variants.length && this._variants[i] != '') {
+                sysLayout = sysLayout + '(' + this._variants[i] + ')';
+            }
+            if (sysLayout == layout) {
+                this._gkbdlayout.lock_group(i);
+                return true;
+            }
+        }
+        return false;
+    },
+
+    _setXkbGroupLayout: function(layout) {
+        let retval = this._xkblayout.setLayout(layout);
+        if (retval[0] >= 0) {
+            /* If an XKB keymap is added into the XKB group, 
+             * this._gkbdlayout.lock_group will be called after
+             * 'group-changed' signal is received. */
+            this._fallbackLockID = retval[0];
+            this._changedXkbOption = retval[1];
+        }
+    },
+
+    _handleEngineSwitch: function(display, screen, window, binding, data) {
+        let name = binding.get_name();
+        if (name != 'trigger-accel') {
+            global.log('Wrong name is binded ' + name);
+            return;
+        }
+        let modifiers = binding.get_modifiers();
+        let backwards = modifiers & Meta.VirtualModifier.SHIFT_MASK;
+        let switcher = new Switcher.Switcher(this);
+
+        switcher.connect('engine-activated',
+                         Lang.bind (this, function (object, name) {
+            if (this._engines == null) {
+                global.log('Engine list is null.');
+                return;
+            }
+            for (let i = 0; i < this._engines.length; i++) {
+                if (name == this._engines[i].get_name()) {
+                    this._switchEngine(i, true);
+                    break;
+                }
+            }}));
+
+        if (!switcher.show(this._engines, backwards, binding.get_mask())) {
+            switcher.destroy();
+        }
     },
 
     _configValueChangedCB: function(bus, section, name, value) {
@@ -266,16 +542,14 @@ IBusPanel.prototype = {
     },
 
     _createShellMenuForIM: function() {
-        if (this._focusIC == null) {
+        if (this._createIMMenuShell()) {
+            this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+            this._propertyManager.createMenuItems(this._indicator.menu);
+        } else {
             let item = new PopupMenu.PopupImageMenuItem(_("No input window"),
                                                         'dialog-information');
             this._indicator.menu.addMenuItem(item);
             this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-        } else {
-            if (this._createIMMenuShell()) {
-                this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-            }
-            this._languageBar.createIMMenuShell();
         }
     },
 
@@ -285,7 +559,7 @@ IBusPanel.prototype = {
         this._indicator.menu.addAction(_("Show Keyboard Layout"),
                                        Lang.bind(this, function() {
             Main.overview.hide();
-            let xkbGroupID = this._xkbGroupID;
+            let xkbGroupID = this._gkbdlayout.get_current_group();
             if (xkbGroupID < 0) {
                 xkbGroupID = 0;
             }
@@ -293,7 +567,7 @@ IBusPanel.prototype = {
         }));
     },
 
-    _onLanguageBarPropertyActivate: function(widget, prop_name, prop_state) {
+    _onPropertyManagerPropertyActivate: function(widget, prop_name, prop_state) {
         this.propertyActivate(prop_name, prop_state);
     },
 
@@ -301,31 +575,6 @@ IBusPanel.prototype = {
         this._indicator.menu.removeAll();
         this._createShellMenuForIM();
         this._createShellMenuForPopup();
-    },
-
-    _getDisabledEngine: function(engine) {
-        if (this._disabledEngines.length == 0) {
-            return null;
-        }
-
-        engine.disabledEnginesID = -1
-        let kbEngine = null;
-
-        for (let j = 0; j < this._disabledEngines.length; j++) {
-            kbEngine = this._disabledEngines[j];
-            if (engine.name == kbEngine.name) {
-                engine.disabledEnginesID = j;
-                break;
-            }
-        }
-
-        if (engine.disabledEnginesID == -1) {
-            return null;
-        }
-
-        kbEngine = this._disabledEngines[engine.disabledEnginesID];
-        kbEngine.disabledEnginesID = engine.disabledEnginesID;
-        return kbEngine;
     },
 
     _getDuplicatedEngineId: function(engine) {
@@ -338,20 +587,6 @@ IBusPanel.prototype = {
             }
         }
         return null;
-    },
-
-    _getLanguageWithDisabledEngine: function(engine) {
-        let lang = engine.language;
-        if (this._useBridgeHotkey() &&
-            engine.name != null &&
-            engine.name.substring(0, this._defaultBridgeEngineName.length)
-                == this._defaultBridgeEngineName) {
-            let kbEngine = this._getDisabledEngine(engine);
-            if (kbEngine != null) {
-                lang = kbEngine.language;
-            }
-        }
-        return lang;
     },
 
     _checkEnginesHaveDuplicatedLang: function(engines) {
@@ -370,7 +605,7 @@ IBusPanel.prototype = {
                 continue;
             }
 
-            let lang_i = this._getLanguageWithDisabledEngine(engine_i);
+            let lang_i = engine_i.language;
             if (engine_i.symbol != undefined && engine_i.symbol != '') {
                 lang_i = engine_i.symbol;
             }
@@ -379,7 +614,7 @@ IBusPanel.prototype = {
                 if (engine_j == null) {
                     continue;
                 }
-                let lang_j = this._getLanguageWithDisabledEngine(engine_j);
+                let lang_j = engine_j.language;
                 if (engine_j.symbol != undefined && engine_j.symbol != '') {
                     lang_j = engine_j.symbol;
                 }
@@ -397,7 +632,7 @@ IBusPanel.prototype = {
         return engines;
     },
 
-    _addEngineInMenu: function(engine) {
+    _addEngineInMenu: function(engine, n) {
         let fullLang = engine.language;
         let lang = IBus.get_language_name(fullLang);
         if (lang == null) {
@@ -422,7 +657,7 @@ IBusPanel.prototype = {
             shortLabel._icon_name = engine.icon;
         }
         let item = new IPopupMenu.PopupActorMenuItem(text, shortLabel);
-        if (engine.isBold) {
+        if (n == 0) {
             item.setShowDot(true);
         } else {
             item.setShowDot(false);
@@ -433,110 +668,22 @@ IBusPanel.prototype = {
         this._indicator.menu.addMenuItem(item);
     },
 
-    _addIMOffMenuItem: function() {
-        let item = new PopupMenu.PopupImageMenuItem(_("Turn off input method"),
-                                                    'window-close');
-        item._engine = 'none';
-        item.connect('activate',
-                     Lang.bind(this, this._imMenuItemShellActivateCB));
-        if (this._focusIC == null || !this._focusIC.is_enabled()) {
-            Common.actorSetSensitive(item.actor, false, item.label);
-        } else {
-            Common.actorSetSensitive(item.actor, true, item.label);
-        }
-        this._indicator.menu.addMenuItem(item);
-    },
-
     _createIMMenuShell: function() {
-        let engines = this._bus.list_active_engines();
-        let currentEngine = null;
-        currentEngine = (this._focusIC != null && this._focusIC.get_engine());
-        if (currentEngine == null) {
-            currentEngine = (engines && engines[0]);
-        }
-        engines = this._checkEnginesHaveDuplicatedLang(engines);
-        for (let i = 0; i < engines.length; i++) {
-            let engine = engines[i];
-            if (engine == null) {
-                continue;
-            }
-            let kbEngine = null;
-            if (engine.name != null &&
-                engine.name.substring(0, this._defaultBridgeEngineName.length)
-                    == this._defaultBridgeEngineName) {
-                if (this._useBridgeHotkey()) {
-                    kbEngine = this._getDisabledEngine(engine);
-                    if (kbEngine == null) {
-                        continue;
-                    }
-                } else {
-                    continue;
-                }
-            }
-            if (kbEngine != null) {
-                kbEngine.isBridge = true;
-                kbEngine.hasDuplicatedLang = engine.hasDuplicatedLang;
-                kbEngine.isBold = (currentEngine != null &&
-                                   currentEngine.name == engine.name) ?
-                                  true : false;
-                this._addEngineInMenu(kbEngine);
-                continue;
-            }
+        for (let i = 0; i < this._engines.length; i++) {
+            let engine = this._engines[i];
             engine.isBridge = false;
-            engine.isBold = (currentEngine != null &&
-                             currentEngine.name == engine.name) ?
-                            true : false;
-            this._addEngineInMenu(engine);
-        }
-        if (engines.length == 0 || engines[0] == null) {
-            return false;
-        }
-        if (!this._useBridgeHotkey()) {
-            this._addIMOffMenuItem();
+            this._addEngineInMenu(engine, i);
         }
         return true;
     },
 
-    _imMenuItemStatusActivateReal: function(engine) {
-        if (typeof engine.valueOf() == 'object') {
-            if (this._disabledEngines.length > 0 &&
-                this._useBridgeHotkey() &&
-                engine.isBridge) {
-                let engines = this._bus.list_active_engines();
-                let currentEngine = null;
-                currentEngine = (this._focusIC != null && this._focusIC.get_engine());
-                if (currentEngine == null) {
-                    currentEngine = (engines && engines[0]);
-                }
-                if (currentEngine != null &&
-                    currentEngine.name != null &&
-                    currentEngine.name.substring(0, this._defaultBridgeEngineName.length)
-                        ==  this._defaultBridgeEngineName) {
-                    this._disabledEnginesPrevID = this._disabledEnginesID;
-                    this._disabledEnginesSwapped = 2;
-                } else {
-                    this._disabledEnginesPrevID = -1;
-                }
-                this._disabledEnginesID = engine.disabledEnginesID;
-                this._focusIC.set_engine(this._disabledEngines[this._disabledEnginesID].name);
-            } else {
-                this._disabledEnginesPrevID = -1;
-                this._focusIC.set_engine(engine.name);
-            }
-        } else {
-            this._disabledEnginesPrevID = -1;
-            this._focusIC.disable();
-        }
-    },
-
     _imMenuItemStatusActivateCB: function(item) {
-        /* this._focusIC is null on gnome-shell because focus-in event is 
-         * happened. So I moved set_engine in focusIn. */
-        if (this._focusIC == null) {
-            this._activeEngine = item._engine;
-            return;
+        for (let i = 0; i < this._engines.length; i++) {
+            if (item._engine.get_name() == this._engines[i].get_name()) {
+                this._switchEngine(i, true);
+                return;
+            }
         }
-        this._imMenuItemStatusActivateReal(item._engine);
     },
 
     _imMenuItemShellActivateCB: function(item, event) {
@@ -565,10 +712,6 @@ IBusPanel.prototype = {
         }
     },
 
-    _setIMName: function(name) {
-        this._languageBar.setIMName(name);
-    },
-
     _updateIconWithProperty: function(prop) {
         if (prop.get_key() != 'InputMode') {
             return;
@@ -580,7 +723,7 @@ IBusPanel.prototype = {
         this._setIMIcon(null, text);
     },
 
-    _getModelFromLayout: function(layout) {
+    _getVariantFromLayout: function(layout) {
         let leftBracket = layout.indexOf('(');
         let rightBracket = layout.indexOf(')');
         if (leftBracket >= 0 && rightBracket > leftBracket) {
@@ -600,26 +743,26 @@ IBusPanel.prototype = {
         return [layout, 'default'];
     },
 
-    _mergeModelsAndOptions: function(curLayout, engineLayout) {
+    _mergeVariantsAndOptions: function(curLayout, engineLayout) {
         let origLayout = curLayout;
-        let engineModel = 'default';
+        let engineVariant = 'default';
         let engineOption = 'default';
-        [engineLayout, engineModel] =
-            this._getModelFromLayout(engineLayout);
+        [engineLayout, engineVariant] =
+            this._getVariantFromLayout(engineLayout);
         [engineLayout, engineOption] =
             this._getOptionFromLayout(engineLayout);
-        if ((engineModel == null || engineModel == 'default') &&
+        if ((engineVariant == null || engineVariant == 'default') &&
             (engineOption == null || engineOption == 'default')) {
             return curLayout;
         }
-        let curModel = 'default';
+        let curVariant = 'default';
         let curOption = 'default';
-        [curLayout, curModel] =
-            this._getModelFromLayout(curLayout);
+        [curLayout, curVariant] =
+            this._getVariantFromLayout(curLayout);
         [curLayout, curOption] =
             this._getOptionFromLayout(curLayout);
         // Currently implemented options only.
-        // Merging layouts and models are a little complicated.
+        // Merging layouts and variants are a little complicated.
         // e.g. ja,ru + ja(kana) == ja,ru,ja(,,kana)
         if (engineOption != null && engineOption != 'default') {
             if (curOption == null || curOption == 'default') {
@@ -628,8 +771,8 @@ IBusPanel.prototype = {
             else if (curOption != null && curOption != 'default') {
                 curOption = curOption + ',' + engineOption;
             }
-            if (curModel != null && curModel != 'default') {
-                curLayout = curLayout + '(' + curModel + ')';
+            if (curVariant != null && curVariant != 'default') {
+                curLayout = curLayout + '(' + curVariant + ')';
             }
             if (curOption != null && curOption != 'default') {
                 curLayout = curLayout + '[' + curOption + ']';
@@ -640,61 +783,11 @@ IBusPanel.prototype = {
     },
 
     _engineGetLayoutWrapper: function(engine, changedState) {
-        const xkbPrefix = 'xkb:layout:';
+        const xkbPrefix = 'xkb:';
         if (engine.name != null &&
-            engine.name.substring(0, xkbPrefix.length) == xkbPrefix &&
-            !this._useBridgeHotkey()) {
+            engine.name.substring(0, xkbPrefix.length) == xkbPrefix) {
             return engine.layout;
-        } else if (engine.name != null &&
-            engine.name.substring(0, xkbPrefix.length) == xkbPrefix &&
-            this._useBridgeHotkey() &&
-            engine.name != null &&
-            engine.name.substring(0, this._defaultBridgeEngineName.length)
-                != this._defaultBridgeEngineName) {
-            return engine.layout;
-        } else if (this._useBridgeHotkey() &&
-            this._disabledEnginesID >= 0 &&
-            this._disabledEngines.length > 0 &&
-            this._disabledEnginesID < this._disabledEngines.length) {
-            if (changedState && this._disabledEnginesPrevID != -1) {
-                /* stateChanged is always called triple because we change
-                 * the engine. So the first two calls are ignored here.
-                 * Since this._disabledEnginesPrevID needs to be reseted
-                 * to -1 and and stateChanged is called multiple times.
-                 * engine.layout is not used.
-                 *
-                 * When stateChanged is called by Control + Space,
-                 * this._disabledEnginesID and this._disabledEnginesPrevID
-                 * are toggled because this._disabledEnginesID is the
-                 * current XKB group id and this._disabledEnginesPrevID
-                 * is the next XKB group id.
-                 *
-                 * When stateChanged is called by ibus activate menu,
-                 * this._disabledEnginesID is the XKB group id.
-                 *
-                 * FIXME: If this._activeEngine is used, focusIn event is
-                 * called by either choosing ibus menu item or switching
-                 * input contexts.
-                 * So there is a bug: After XKB group is switched by
-                 * ibus menu, if the input contexts are switched, 
-                 * the next toggled input method has next XKB group keymap
-                 * instead of the current XKB group keymap.
-                 * focusIn event don't know either choosing ibus menu or 
-                 * switching input contexts are happened.
-                 */
-                if (this._disabledEnginesSwapped < 2) {
-                    let x = this._disabledEnginesPrevID;
-                    this._disabledEnginesPrevID = this._disabledEnginesID;
-                    this._disabledEnginesID = x;
-                    this._disabledEnginesSwapped = 
-                        (this._disabledEnginesSwapped == 0) ? 1 : 0;
-                } else {
-                    this._disabledEnginesSwapped = 
-                        (this._disabledEnginesSwapped < 4) ?
-                        this._disabledEnginesSwapped + 1 : 0;
-                }
-            }
-            let retval = this._disabledEngines[this._disabledEnginesID].layout;
+        } else if (engine.layout != 'default') {
             /* engine is an input-method or a keymap and if engine is
              * a keymap, the layout is not 'default'.
              * if engine is an input-method, the layout is merged with the
@@ -702,220 +795,25 @@ IBusPanel.prototype = {
              */
             if (engine.layout != null && 
                 engine.layout.substring(0, 'default'.length) == 'default') {
-                return this._mergeModelsAndOptions(retval, engine.layout);
+                return this._mergeVariantsAndOptions(retval, engine.layout);
             }
-            return retval;
-        } else if (engine.layout != null && 
-                   engine.layout.substring(0, 'default'.length) == 'default') {
-            return engine.layout;
-        } else {
-            return 'default';
         }
+        return engine.layout;
     },
 
-    _registryGetLangFromLayout: function(registry, layout, model) {
-        let langs = null;
-        let lang = 'en';
-        let label = null;
-        if (model == '') {
-            model = null;
-        }
-        if (model != null) {
-            label = layout + '(' + model + ')';
-            langs = registry.layout_lang_get_langs(label);
-        }
-        if (langs == null || langs.length == 0) {
-            label = layout;
-            langs = registry.layout_lang_get_langs(label);
-        }
-        if (langs != null && langs.length > 0) {
-            lang = langs[0] + '';
-        }
-        return lang;
-    },
-
-    _setDefaultLayoutEngine: function(useBridgeHotkey) {
-        if (!this._useSysLayout()) {
-            return;
-        }
-
-        let defaultLayout = this._defaultLayout;
-        let defaultModel = this._defaultModel;
-
-        if (defaultLayout == 'default') {
-            defaultLayout = this._xkblayout.getDefaultLayout()[0];
-            defaultModel = this._xkblayout.getDefaultLayout()[1];
-        }
-        if (defaultModel == 'default') {
-            defaultModel = this._xkblayout.getDefaultLayout()[1];
-        }
-
-        let layouts = defaultLayout.split(',');
-        let models = null;
-        if (defaultModel != null && defaultModel != '') {
-            models = defaultModel.split(',');
-        }
-        if (this._disabledEngines.length == 0) {
-            for (let i = 0; layouts[i] != null; i++) {
-                let layout = layouts[i];
-                let registry = new IBus.XKBConfigRegistry();
-                let model = null;
-                if (models != null && i < models.length) {
-                    model = models[i];
-                }
-                let lang = this._registryGetLangFromLayout(registry,
-                                                           layout,
-                                                           model);
-                model = null;
-                if (i == 0) {
-                    layout = defaultLayout;
-                    model = defaultModel;
-                } else if (models != null && i < models.length) {
-                    model = models[i];
-                }
-                if (model == '') {
-                    model = null;
-                }
-                let modelDesc = _("Default Layout");
-                if (i == 0) {
-                    let len = 0;
-                    // layout 'in' and model 'eng' is English layout.
-                    if (model != 'eng') {
-                        for (let j = 0; models && j < models.length; j++) {
-                            len += models[j].length;
-                        }
-                    }
-                    if (len != 0) {
-                        modelDesc = modelDesc + ' (' + model + ')';
-                    }
-                } else if (model != null) {
-                    modelDesc = modelDesc + ' (' + model + ')';
-                }
-                let name = this._defaultBridgeEngineName
-                    + '#' + i.toString();
-                let engine = XKBLayout.engineDescNew(lang,
-                                                     layout,
-                                                     _("Default Layout"),
-                                                     model,
-                                                     modelDesc,
-                                                     name);
-                this._disabledEngines.push(engine);
-            }
-            this._xkbGroupID = this._xkblayout.getGroup();
-            this._disabledEngines_id = this._xkbGroupID;
-            if (useBridgeHotkey && this._disabledEngines.length > 0) {
-                this._focusIC.set_xkb_engines(this._disabledEngines);
-            }
-        }
-        if (!useBridgeHotkey) {
-            return;
-        }
-        if (this._disabledEngines.length > 0) {
-            if (!this._focusIC == null) {
-                return;
-            }
-            let engine = this._focusIC.get_engine();
-            if (engine == null) {
-                if (this._disabledEnginesID < 0) {
-                    this._disabledEnginesID = 0;
-                }
-                if (this._disabledEnginesID < this._disabledEngines.length) {
-                    this._focusIC.focus_in();
-                    this._focusIC.set_engine(this._disabledEngines[this._disabledEnginesID].name);
-                }
-            } else if (engine != null && !this._focusIC.is_enabled()) {
-                this._focusIC.focus_in();
-                this._focusIC.enable();
-            }
-        }
-    },
-
-    _focusInBridgeHotkey: function(enabled, reset) {
-        if (enabled == false) {
-            if (reset) {
-                this.reset();
-            }
-            this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
-            this._setIMName(null);
-            if (this._useSysLayout()) {
-                this._xkblayout.setLayout();
-            }
-        } else {
-            let engine = this._focusIC.get_engine();
-            if (engine) {
-                let kbEngine = null;
-                if (this._useBridgeHotkey() &&
-                    engine.name != null &&
-                    engine.name.substring(0, this._defaultBridgeEngineName.length)
-                        == this._defaultBridgeEngineName) {
-                    kbEngine = this._getDisabledEngine(engine);
-                }
-                if (kbEngine != null) {
-                    engine = kbEngine;
-                }
-                let imIcon = engine.language.substring(0,2);
-                if (engine.language == 'other') {
-                    imIcon = '+@';
-                }
-                if (engine.symbol != undefined && engine.symbol != '') {
-                    imIcon = engine.symbol;
-                }
-                let suffix = this._getDuplicatedEngineId(engine);
-                if (suffix != null) {
-                    imIcon += suffix;
-                }
-                this._setIMIcon(engine.icon, imIcon);
-                this._setIMName(engine.longname);
-                if (this._useSysLayout()) {
-                    this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, reset));
-                }
-            } else {
-                this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
-                this._setIMName(null);
-                if (this._useSysLayout()) {
-                    this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, reset));
-                }
-            }
-        }
-    },
-
-    _focusInOnOffHotkey: function(enabled, reset) {
-        if (enabled == false) {
-            if (reset) {
-                this.reset();
-            }
-            this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
-            this._setIMName(null);
-            if (this._useSysLayout()) {
-                this._xkblayout.setLayout();
-            }
-        } else {
-            let engine = this._focusIC.get_engine();
-            if (engine) {
-                let imIcon = engine.language.substring(0,2);
-                if (engine.language == 'other') {
-                    imIcon = '+@';
-                }
-                if (engine.symbol != undefined && engine.symbol != '') {
-                    imIcon = engine.symbol;
-                }
-                let suffix = this._getDuplicatedEngineId(engine);
-                if (suffix != null) {
-                    imIcon += suffix;
-                }
-                this._setIMIcon(engine.icon, imIcon);
-                this._setIMName(engine.longname);
-                if (this._useSysLayout()) {
-                    this._xkblayout.setLayout(this._engineGetLayoutWrapper(engine, false));
-                }
-            } else {
-                this._setIMIcon(XKBLayout.ICON_KEYBOARD, null);
-                this._setIMName(null);
-                if (this._useSysLayout()) {
-                    this._xkblayout.setLayout();
-                }
-            }
-        }
+    getIconTextFromEngine: function(engine) {
+         let imIcon = engine.language.substring(0,2);
+         if (engine.language == 'other') {
+             imIcon = '+@';
+         }
+         if (engine.symbol != undefined && engine.symbol != '') {
+             imIcon = engine.symbol;
+         }
+         let suffix = this._getDuplicatedEngineId(engine);
+         if (suffix != null) {
+             imIcon += suffix;
+         }
+         return imIcon;
     },
 
     setCursorLocation: function(panel, x, y, w, h) {
@@ -986,71 +884,32 @@ IBusPanel.prototype = {
         for (let i = 0; props.get(i) != null; i++) {
             this._updateIconWithProperty(props.get(i));
         }
-        this._languageBar.registerProperties(props);
+        this._propertyManager.registerProperties(props);
     },
 
     updateProperty: function(panel, prop) {
         this._updateIconWithProperty(prop);
-        this._languageBar.updateProperty(prop);
+        this._propertyManager.updateProperty(prop);
     },
 
     focusIn: function(panel, path) {
-        this.reset();
-        this._focusIC = IBus.InputContext.get_input_context(path,
-                                                            this._bus.get_connection());
-        let enabled = this._focusIC.is_enabled();
-        this._languageBar.setEnabled(enabled);
-        if (this._activeEngine != null) {
-            this._imMenuItemStatusActivateReal(this._activeEngine);
-            this._activeEngine = null;
-        }
-        if (this._activeIBusProperties != null) {
-            for (let i = 0; i < this._activeIBusProperties.length; i++) {
-                this._panel.property_activate(this._activeIBusProperties[i][0],
-                                              this._activeIBusProperties[i][1]);
-            }
-            this._activeIBusProperties = null;
-        }
-
-        let useBridgeHotkey = this._useBridgeHotkey();
-        this._setDefaultLayoutEngine(useBridgeHotkey);
-        if (useBridgeHotkey) {
-            if (this._useSysLayout() &&
-                this._xkbGroupID != this._xkblayout.getGroup()) {
-                this._xkbGroupID = this._xkblayout.getGroup();
-                this._disabledEnginesID = this._xkbGroupID;
-            }
-            this._focusInBridgeHotkey(enabled, false);
-        } else {
-            this._focusInOnOffHotkey(enabled, false);
-        }
     },
 
     focusOut: function(panel, path) {
         this.reset();
         this._focusIC = null;
-        this._languageBar.setEnabled(false);
-
-        if (this._useBridgeHotkey()) {
-            this._focusInBridgeHotkey(false, false);
-        } else {
-            this._focusInOnOffHotkey(false, false);
-        }
     },
 
     stateChanged: function(panel) {
-        if (this._focusIC == null) {
+        let engine = null;
+        if (this._bus.is_connected()) {
+            engine = this._bus.get_global_engine();
+        } else if (this._engines.length > 0) {
+            engine = this._engines[this._gkbdlayout.get_current_group()];
+        } else {
             return;
         }
-
-        let enabled = this._focusIC.is_enabled();
-        this._languageBar.setEnabled(enabled);
-
-        if (this._useBridgeHotkey()) {
-            this._focusInBridgeHotkey(enabled, true);
-        } else {
-            this._focusInOnOffHotkey(enabled, true);
-        }
+        this._setIMIcon(engine.icon, this.getIconTextFromEngine(engine));
     },
 
     reset: function(ic) {
@@ -1078,15 +937,6 @@ IBusPanel.prototype = {
     },
 
     propertyActivate: function(propName, propState) {
-        /* this._focusIC is null on gnome-shell because focus-in event is 
-         * happened. So I moved property_activate in focusIn. */
-        if (this._focusIC == null) {
-            if (this._activeIBusProperties == null) {
-                this._activeIBusProperties = [];
-            }
-            this._activeIBusProperties.push([propName, propState]);
-            return;
-        }
         this._panel.property_activate(propName, propState);
     },
 
