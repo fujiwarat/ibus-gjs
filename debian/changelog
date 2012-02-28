@@ -1,0 +1,5 @@
+ibus-gjs (3-0ubuntu1) oneiric; urgency=low
+
+  * New upstream release with lots of bug fixes and feature improvements.
+
+ -- Meng Zhuo <mengzhuo1203@gmail.com>  Tue, 28 Feb 2012 11:12:00 +0800

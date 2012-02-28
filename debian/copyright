@@ -1,0 +1,13 @@
+This package was debianized by Meng Zhuo <mengzhuo1203@gmail.com> on Tue,  28 Feb 2012 11:05 +0800
+
+Upstream Author: Takao Fujiwara <takao.fujiwara1@gmail.com>, 
+
+Copyright: Takao Fujiwara <takao.fujiwara1@gmail.com>
+
+It was downloaded from https://github.com/fujiwarat/ibus-gjs
+
+License:
+    GPL v3 see http://www.gnu.org/ for details
+
+
+The Debian packaging is copyright 2012 Meng Zhuo <mengzhuo1203@gmail.com> and available on the same terms as the package itself (see above).

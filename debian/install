@@ -1,0 +1,2 @@
+extensions/ibus-indicator@example.com /usr/share/gnome-shell/extensions/
+js/ui/status/ibus /usr/share/gnome-shell/js/ui/status/

@@ -1,0 +1,68 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ibus-gjs HEAD\n"
+"Report-Msgid-Bugs-To: http://code.google.com/p/ibus/issues/entry\n"
+"POT-Creation-Date: 2011-07-13 17:02+0900\n"
+"PO-Revision-Date: 2012-02-28 17:59+0800\n"
+"Last-Translator: mengzhuo <mengzhuo1203@gmail.com>\n"
+"Language-Team: Chinese\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: ../js/ui/status/ibus/candidatePanel.js:324
+msgid "Previous page"
+msgstr "上页"
+
+#: ../js/ui/status/ibus/candidatePanel.js:330
+msgid "Next page"
+msgstr "下页"
+
+#: ../js/ui/status/ibus/panel.js.in:202
+msgid "No input window"
+msgstr "没有输入窗口"
+
+#: ../js/ui/status/ibus/panel.js.in:213
+msgid "Preferences"
+msgstr "首选项"
+
+#: ../js/ui/status/ibus/panel.js.in:218
+msgid "Keyboard configuration"
+msgstr "键盘布局设置"
+
+#: ../js/ui/status/ibus/panel.js.in:223
+msgid "Restart"
+msgstr "重启"
+
+#: ../js/ui/status/ibus/panel.js.in:227
+msgid "Quit"
+msgstr "退出"
+
+#: ../js/ui/status/ibus/panel.js.in:324
+msgid "Other"
+msgstr "其他"
+
+#: ../js/ui/status/ibus/panel.js.in:348
+msgid "Turn off input method"
+msgstr "关闭输入法"
+
+#: ../js/ui/status/ibus/panel.js.in:582
+#: ../js/ui/status/ibus/panel.js.in:588
+msgid "Default Layout"
+msgstr "默认外观"
+
+#: ../js/ui/status/ibus/xkbLayout.js.in:41
+msgid "Command not found"
+msgstr "命令没有找到"
+
+#: ../js/ui/status/ibus/xkbLayout.js.in:57
+#, c-format
+msgid "Execution of '%s' failed:"
+msgstr "执行'%s'失败:"
+

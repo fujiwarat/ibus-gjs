@@ -1,0 +1,11 @@
+Source: ibus-gjs
+Section: misc
+Priority: extra
+Maintainer: Meng Zhuo <mengzhuo1203@gmail.com>
+Build-Depends: build-essential
+Standards-Version: 3
+
+Package: ibus-gjs
+Architecture: all
+Depends: gnome-shell (>= 3.2)
+Description: Gnome Shell Extension to show Ibus input method on the status bar
