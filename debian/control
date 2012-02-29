@@ -14,5 +14,5 @@ Homepage: https://github.com/fujiwarat/ibus-gjs
 
 Package: ibus-gjs
 Architecture: any
-Depends: ${misc:Depends}, gnome-shell
+Depends: ${misc:Depends}
 Description: Add a system status menu for input-methods using IBus

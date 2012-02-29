@@ -1,1 +1,1 @@
-misc:Depends=
+misc:Depends= gnome-shell, ibus
