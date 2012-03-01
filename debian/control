@@ -1,11 +1,18 @@
 Source: ibus-gjs
-Section: misc
+Section: gnome
 Priority: extra
 Maintainer: Meng Zhuo <mengzhuo1203@gmail.com>
-Build-Depends: build-essential
-Standards-Version: 3
+Standards-Version: 3.9.2
+Build-Depends: debhelper (>= 7),
+ cdbs,
+ gnome-pkg-tools,
+ intltool,
+ libglib2.0-dev,
+ libgtop2-dev (>= 2.28.3),
+ libgnome-desktop-3-dev (>= 2.91.6)
+Homepage: https://github.com/fujiwarat/ibus-gjs
 
 Package: ibus-gjs
-Architecture: all
-Depends: gnome-shell (>= 3.2)
-Description: Gnome Shell Extension to show Ibus input method on the status bar
+Architecture: any
+Depends: ${misc:Depends}
+Description: Add a system status menu for input-methods using IBus
