@@ -1,5 +1,17 @@
-ibus-gjs (3-0ubuntu1) oneiric; urgency=low
+ibus-gjs (3+ubuntu02) oneiric; urgency=low
 
-  * New upstream release with lots of bug fixes and feature improvements.
+  * Change Logs
 
- -- Meng Zhuo <mengzhuo1203@gmail.com>  Tue, 28 Feb 2012 11:12:00 +0800
+ -- Meng Zhuo <mengzhuo1203@gmail.com>  Thu, 01 Mar 2012 23:02:06 +0800
+
+ibus-gjs (3+ubuntu01) oneiric; urgency=low
+
+  * FIX no data
+
+ -- Meng Zhuo <mengzhuo1203@gmail.com>  Wed, 29 Feb 2012 19:02:06 +0800
+
+ibus-gjs (3-1) oneiric; urgency=low
+
+  * Initial release (Closes: #nnnn)  <nnnn is the bug number of your ITP>
+
+ -- Meng Zhuo <mengzhuo1203@gmail.com>  Tue, 28 Feb 2012 22:59:06 +0800
