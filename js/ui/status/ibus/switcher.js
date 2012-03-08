@@ -90,7 +90,7 @@ const Switcher = new Lang.Class({
         // the switcher appears underneath the current pointer location
         this._disableHover();
 
-        Main.uiGroup.add_actor(this.actor);
+        Main.uiGroup.add_child(this.actor);
     },
 
     _getPreferredWidth: function (actor, forHeight, alloc) {
@@ -177,7 +177,7 @@ const Switcher = new Lang.Class({
         this.actor.connect('scroll-event', Lang.bind(this, this._onScroll));
 
         this._appSwitcher = new EngineSwitcher(engines, this);
-        this.actor.add_actor(this._appSwitcher.actor);
+        this.actor.add_child(this._appSwitcher.actor);
         this._appSwitcher.connect('item-activated', Lang.bind(this, this._appActivated));
         this._appSwitcher.connect('item-entered', Lang.bind(this, this._appEntered));
 
@@ -371,12 +371,12 @@ const SwitcherList = new Lang.Class({
 
         this._clipBin = new St.Bin({style_class: 'cbin'});
         this._clipBin.child = this._list;
-        this.actor.add_actor(this._clipBin);
+        this.actor.add_child(this._clipBin);
 
         this._leftGradient = new St.BoxLayout({style_class: 'thumbnail-scroll-gradient-left', vertical: true});
         this._rightGradient = new St.BoxLayout({style_class: 'thumbnail-scroll-gradient-right', vertical: true});
-        this.actor.add_actor(this._leftGradient);
-        this.actor.add_actor(this._rightGradient);
+        this.actor.add_child(this._leftGradient);
+        this.actor.add_child(this._rightGradient);
 
         // Those arrows indicate whether scrolling in one direction is possible
         this._leftArrow = new St.DrawingArea({ style_class: 'switcher-arrow',
@@ -388,8 +388,8 @@ const SwitcherList = new Lang.Class({
         this._rightArrow.connect('repaint', Lang.bind(this,
             function() { _drawArrow(this._rightArrow, St.Side.RIGHT); }));
 
-        this.actor.add_actor(this._leftArrow);
-        this.actor.add_actor(this._rightArrow);
+        this.actor.add_child(this._leftArrow);
+        this.actor.add_child(this._rightArrow);
 
         this._items = [];
         this._highlighted = -1;
@@ -447,7 +447,7 @@ const SwitcherList = new Lang.Class({
                                    reactive: true });
 
         bbox.set_child(item);
-        this._list.add_actor(bbox);
+        this._list.add_child(bbox);
 
         let n = this._items.length;
         bbox.connect('clicked', Lang.bind(this, function() { this._onItemClicked(n); }));
@@ -469,7 +469,7 @@ const SwitcherList = new Lang.Class({
     addSeparator: function () {
         let box = new St.Bin({ style_class: 'separator' });
         this._separator = box;
-        this._list.add_actor(box);
+        this._list.add_child(box);
     },
 
     highlight: function(index) {
@@ -687,12 +687,12 @@ const EngineIcon = new Lang.Class({
                                  icon_type: St.IconType.SYMBOLIC });
         }
         if (icon != null) {
-            this._iconBin.add_actor(icon, { x_fill: false, y_fill: false });
+            this._iconBin.child = icon
         }
 
-        this.actor.add(this._iconBin, { x_fill: false, y_fill: false } );
+        this.actor.add_child(this._iconBin, { x_fill: false, y_fill: false } );
         this.label = new St.Label({ text: this.engine.get_longname() });
-        this.actor.add(this.label, { x_fill: false });
+        this.actor.add_child(this.label, { x_fill: false });
     },
 
     setSize: function(size) {
@@ -839,7 +839,7 @@ const ThumbnailList = new Lang.Class({
 
             let bin = new St.Bin({ style_class: 'thumbnail' });
 
-            box.add_actor(bin);
+            box.add_child(bin);
             this._thumbnailBins.push(bin);
 
             let title = windows[i].get_title();
@@ -848,8 +848,8 @@ const ThumbnailList = new Lang.Class({
                 // St.Label doesn't support text-align so use a Bin
                 let bin = new St.Bin({ x_align: St.Align.MIDDLE });
                 this._labels.push(bin);
-                bin.add_actor(name);
-                box.add_actor(bin);
+                bin.add_child(name);
+                box.add_child(bin);
 
                 this.addItem(box, name);
             } else {
@@ -885,7 +885,7 @@ const ThumbnailList = new Lang.Class({
                                                 height: height * scale });
 
             this._thumbnailBins[i].set_height(binHeight);
-            this._thumbnailBins[i].add_actor(clone);
+            this._thumbnailBins[i].add_child(clone);
             this._clones.push(clone);
         }
 

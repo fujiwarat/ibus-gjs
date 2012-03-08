@@ -404,7 +404,7 @@ SeparatorShellMenuItem.prototype = {
                                                   track_hover: true,
                                                   can_focus: true });
         this._drawingArea = new St.DrawingArea({ style_class: 'popup-separator-menu-item' });
-        this.actor.add_actor(this._drawingArea);
+        this.actor.add_child(this._drawingArea);
         this._drawingArea.connect('repaint', Lang.bind(this, this._onRepaint));
     },
 
@@ -468,15 +468,15 @@ SubMenu.prototype = {
         this._item_pos = 0;
         let l = this._parent.contentLayout.get_children_list();
         if (l != null) {
-            // contentLayout.add(SubMenuItem) is called after this instance
-            // is generated.
+            // contentLayout.add_child(SubMenuItem) is called after this
+            // instance is generated.
             this._item_pos = l.length + 1;
         }
         this.actor = new St.ScrollView({ style_class: 'popup-sub-menu',
                                          hscrollbar_policy: Gtk.PolicyType.NEVER,
                                          vscrollbar_policy: Gtk.PolicyType.NEVER });
         this._vbox = new St.BoxLayout({ vertical: true });
-        this.actor.add_actor(this._vbox);
+        this.actor.add_child(this._vbox);
         this._createItems(this._prop.get_sub_props());
         this.actor.hide();
     },
@@ -525,9 +525,9 @@ SubMenu.prototype = {
 
             let hbox = new St.BoxLayout({ vertical: false });
             let pad = new St.Label({ text: '\t' });
-            hbox.add(pad);
-            hbox.add(item.actor);
-            this._vbox.add(hbox);
+            hbox.add_child(pad);
+            hbox.add_child(item.actor);
+            this._vbox.add_child(hbox);
             this._subItems.push(item);
 
             if (prop.get_prop_type() != IBus.PropType.NORMAL &&
@@ -548,7 +548,7 @@ SubMenu.prototype = {
         if (this.isOpen) {
             return;
         }
-        this._parent.contentLayout.add(this.actor);
+        this._parent.contentLayout.add_child(this.actor);
         this._parent.contentLayout.move_child(this.actor, this._item_pos);
         this.isOpen = true;
         this.actor.show();
@@ -560,7 +560,7 @@ SubMenu.prototype = {
         }
         this.actor.hide();
         this.isOpen = false;
-        this._parent.contentLayout.remove_actor(this.actor);
+        this._parent.contentLayout.remove_child(this.actor);
     },
 
     toggle: function() {
@@ -627,7 +627,7 @@ SubMenuItem.prototype = {
         this._parentList = this._parent.contentLayout.get_children_list();
         let l = this._parentList;
         for (let i = 0; l != null && l[i] != null; i++) {
-            this._parent.contentLayout.remove_actor(l[i]);
+            this._parent.contentLayout.remove_child(l[i]);
             l[i].unparent();
         }
         let props = this._prop.get_sub_props();

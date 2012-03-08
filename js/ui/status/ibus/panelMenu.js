@@ -49,13 +49,13 @@ SystemStatusLabelButton.prototype = {
 
     _clearActor: function() {
         if (this._iconActor != null) {
-            this.actor.remove_actor(this._iconActor);
+            this.actor.remove_child(this._iconActor);
             this._iconActor.destroy();
             this._iconActor = null;
             this._iconName = null;
         }
         if (this._labelActor) {
-            this.actor.remove_actor(this._labelActor);
+            this.actor.remove_child(this._labelActor);
             this._labelActor.destroy();
             this._labelActor = null;
             this._label = null;
@@ -68,7 +68,7 @@ SystemStatusLabelButton.prototype = {
         this._iconActor = new St.Icon({ icon_name: iconName,
                                         icon_type: St.IconType.SYMBOLIC,
                                         style_class: 'system-status-icon' });
-        this.actor.add_actor(this._iconActor);
+        this.actor.add_child(this._iconActor);
         this.actor.queue_redraw();
     },
 
@@ -76,7 +76,7 @@ SystemStatusLabelButton.prototype = {
         this._clearActor();
         this._label = label;
         this._labelActor = new St.Label({ text: label });
-        this.actor.add_actor(this._labelActor);
+        this.actor.add_child(this._labelActor);
         this.actor.queue_redraw();
     },
 
