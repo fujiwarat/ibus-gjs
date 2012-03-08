@@ -129,8 +129,9 @@ AC_ARG_WITH(gnome-shell-js-dir,
 #  whole stable release)
 #  <minor> and <major> must match
 #  Each target version must be at least <major> and <minor>
+SED=${SED:-'sed'}
+ECHO=${ECHO:-'echo'}
 GJS=${GJS:-'gjs'}
-GREP=${GREP:-'grep'}
 GET_JS_VERSION () {
     VERSION_STRING=$1
     CHECK_JS_VERSION_TEMPLATE="
@@ -156,17 +157,36 @@ try {
 } catch (e) {
 }
 "
-    # Added a workaround with tail.
-    # GJS 0.7.14 has unnecessary strings of
-    # "DEBUG: Command line: gjs" and
-    # "DEBUG: Creating new context to eval console script"
-    $GJS -I "$GNOME_SHELL_JS_DIR" -c "$CHECK_JS_VERSION_TEMPLATE" |\
-        $GREP -v "DEBUG:"
+    $GJS -I "$GNOME_SHELL_JS_DIR" -c "$CHECK_JS_VERSION_TEMPLATE"
 }
 
-GNOME_SHELL_VERSION=`GET_JS_VERSION 'Config.PACKAGE_VERSION'`
-GJS_VERSION=`GET_JS_VERSION 'Config.GJS_VERSION'`
+
+# Check GNOME-Shell VERSION
+AC_ARG_WITH(gnome-shell-version,
+    AS_HELP_STRING([--with-gnome-shell-version[=$DIR]],
+        [Set comma separated gnome-shell versions or auto (default: auto)]),
+    GNOME_SHELL_VERSION=$with_gnome_shell_version,
+    GNOME_SHELL_VERSION="auto"
+)
+if test x"$GNOME_SHELL_VERSION" = x'auto' ; then
+    GNOME_SHELL_VERSION=`GET_JS_VERSION 'Config.PACKAGE_VERSION'`
+else
+    GNOME_SHELL_VERSION=`$ECHO "$GNOME_SHELL_VERSION" | $SED -e 's/,[ ]*/"&"/g'`
+fi
 AC_SUBST(GNOME_SHELL_VERSION)
+
+# Check GJS VERSION
+AC_ARG_WITH(gjs-version,
+    AS_HELP_STRING([--with-gjs-version[=$DIR]],
+        [Set comma separated gjs versions or auto (default: auto)]),
+    GJS_VERSION=$with_gjs_version,
+    GJS_VERSION="auto"
+)
+if test x"$GJS_VERSION" = x'auto' ; then
+    GJS_VERSION=`GET_JS_VERSION 'Config.GJS_VERSION'`
+else
+    GJS_VERSION=`$ECHO "$GJS_VERSION" | $SED -e 's/,[ ]*/"&"/g'`
+fi
 AC_SUBST(GJS_VERSION)
 
 # define GETTEXT_* variables

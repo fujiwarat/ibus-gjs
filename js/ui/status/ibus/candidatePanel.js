@@ -1,9 +1,9 @@
-/* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
+// -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /*
- * Copyright 2011 Red Hat, Inc.
- * Copyright 2011 Peng Huang <shawn.p.huang@gmail.com>
- * Copyright 2011 Takao Fujiwara <tfujiwar@redhat.com>
- * Copyright 2011 Tiger Soldier <tigersoldi@gmail.com>
+ * Copyright 2012 Red Hat, Inc.
+ * Copyright 2012 Peng Huang <shawn.p.huang@gmail.com>
+ * Copyright 2012 Takao Fujiwara <tfujiwar@redhat.com>
+ * Copyright 2012 Tiger Soldier <tigersoldi@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as

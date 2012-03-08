@@ -1,5 +1,5 @@
-{"shell-version": ["@GNOME_SHELL_VERSION@"],
- "js-version": ["@GJS_VERSION@"],
+{"shell-version": ["@GNOME_SHELL_VERSION@", "3.2"],
+ "js-version": ["@GJS_VERSION@", "1.30"],
  "uuid": "ibus-indicator@example.com",
  "name": "Input-Method Status Indicator",
  "description": "Add a system status menu for input-methods using IBus",
