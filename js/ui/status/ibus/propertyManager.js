@@ -19,21 +19,136 @@
  */
 
 const IBus = imports.gi.IBus;
-const St = imports.gi.St;
 const Lang = imports.lang;
 const Signals = imports.signals;
+
 const PopupMenu = imports.ui.popupMenu;
-const Main = imports.ui.main;
-
-const PropItem = imports.ui.status.ibus.propItem;
 const Common = imports.ui.status.ibus.common;
+const PropItem = imports.ui.status.ibus.propItem;
 
-function ShellMenu(prop) {
+function PropertyManager() {
+    this._init();
+}
+
+PropertyManager.prototype = {
+    _init: function() {
+        this._props = null;
+    },
+
+    _createMenuItemsInternal: function(menu) {
+        let props = this._props;
+        if (!props) {
+            return;
+        }
+
+        // Do not have to init this._menuItems here because panel always
+        // calls _indicator.menu.removeAll.
+
+        let item = null;
+        let prop = null;
+        let radioGroup = [];
+
+        for (let i = 0; props.get(i) != null; i++) {
+            prop = props.get(i);
+            if (prop.get_key().toLowerCase() == 'setup' &&
+                prop.get_prop_type() == IBus.PropType.NORMAL) {
+                // engine preference is not shown here.
+                // Users will access it from gnome-control-center.
+                continue;
+            }
+            if (prop.get_prop_type() == IBus.PropType.NORMAL) {
+                item = new PropImageMenuItem(prop);
+            }
+            else if (prop.get_prop_type() == IBus.PropType.TOGGLE) {
+                item = new PropCheckMenuItem(prop);
+            }
+            else if (prop.get_prop_type() == IBus.PropType.RADIO) {
+                item = new PropRadioMenuItem(radioGroup, prop);
+                radioGroup.push(item);
+                for (let j = 0; j < radioGroup.length; j++) {
+                    radioGroup[j].setGroup(radioGroup);
+                }
+            }
+            else if (prop.get_prop_type() == IBus.PropType.SEPARATOR) {
+                item = new PropSeparatorMenuItem();
+                radioGroup = [];
+            }
+            else if (prop.get_prop_type() == IBus.PropType.MENU) {
+                item = new PropMenu(prop);
+            }
+            else {
+                IBusException('Unknown property type = %d' % prop.get_prop_type());
+            }
+
+            item.setSensitive(prop.get_sensitive());
+
+            if (prop.get_visible()) {
+                item.show();
+            } else {
+                item.hide();
+            }
+
+            menu.addMenuItem(item.item);
+            item.connect('property-activate',
+                         Lang.bind(this, this._onItemPropertyActivate));
+        }
+
+       if (props.get(0) != null) {
+           menu.addMenuItem(new PropSeparatorMenuItem().item);
+       }
+    },
+
+    setProperties: function(props) {
+        this._props = props;
+    },
+
+    createMenuItems: function(menu) {
+        return this._createMenuItemsInternal(menu);
+    },
+
+    _replaceProperty: function(old_prop, new_prop) {
+        old_prop.set_label(new_prop.get_label());
+        old_prop.set_icon(new_prop.get_icon());
+        old_prop.set_tooltip(new_prop.get_tooltip());
+        old_prop.set_sensitive(new_prop.get_sensitive());
+        old_prop.set_visible(new_prop.get_visible());
+        old_prop.set_state(new_prop.get_state());
+        old_prop.set_sub_props(new_prop.get_sub_props());
+    },
+
+    _onItemPropertyActivate: function(w, n, s) {
+        this.emit('property-activate', n, s);
+    },
+
+    _onItemShowEngineAbout: function(w, n, s) {
+        this.emit('show-engine-about');
+    },
+
+    registerProperties: function(props) {
+        this._props = props;
+    },
+
+    updateProperty: function(prop) {
+        if (this._props) {
+            for (let i = 0; this._props.get(i) != null; i++) {
+                let p = this._props.get(i);
+                if (p.get_key() == prop.get_key() && p.get_prop_type() == prop.get_prop_type()) {
+                    this._replaceProperty(p, prop);
+                    break;
+                }
+            }
+        }
+    }
+};
+
+Signals.addSignalMethods(PropertyManager.prototype);
+
+function PropMenu(prop) {
     this._init(prop);
 }
 
 /**
- * ShellMenu:
+ * PropMenu:
  * @prop: IBus.Property
  *
  * This class can be used to display the sub menu in the active menu
@@ -42,7 +157,7 @@ function ShellMenu(prop) {
  * This class also forwards the signal of 'property-activate' from
  * the sub menu items.
  */
-ShellMenu.prototype = {
+PropMenu.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
     _init: function(prop) {
@@ -62,20 +177,20 @@ ShellMenu.prototype = {
         for (let i = 0; props.get(i) != null; i++) {
             let prop = props.get(i);
             if (prop.get_prop_type() == IBus.PropType.NORMAL) {
-                item = new ImageShellMenuItem(prop);
+                item = new PropImageMenuItem(prop);
             } else if (prop.get_prop_type() == IBus.PropType.TOGGLE) {
-                item = new CheckShellMenuItem(prop);
+                item = new PropCheckMenuItem(prop);
             } else if (prop.get_prop_type() == IBus.PropType.RADIO) {
-                item = new RadioShellMenuItem(radioGroup, prop);
+                item = new PropRadioMenuItem(radioGroup, prop);
                 radioGroup.push(item);
                 for (let j = 0; j < radioGroup.length; j++) {
                     radioGroup[j].setGroup(radioGroup);
                 }
             } else if (prop.get_prop_type() == IBus.PropType.SEPARATOR) {
-                item = new SeparatorShellMenuItem();
+                item = new PropSeparatorMenuItem();
                 radioGroup = [];
             } else if (prop.get_prop_type() == IBus.PropType.MENU) {
-                item = new ShellMenu(prop);
+                item = new PropMenu(prop);
             } else {
                 assert (false);
             }
@@ -103,9 +218,6 @@ ShellMenu.prototype = {
         }
     },
 
-    _propertyClicked: function(item, prop) {
-    },
-
     _onItemPropertyActivate: function (w, n, s) {
         this.emit('property-activate', n, s);
     },
@@ -129,20 +241,20 @@ ShellMenu.prototype = {
     }
 };
 
-Signals.addSignalMethods(ShellMenu.prototype);
+Signals.addSignalMethods(PropMenu.prototype);
 
-function ImageShellMenuItem(prop) {
+function PropImageMenuItem(prop) {
     this._init(prop);
 }
 
 /**
- * ImageShellMenuItem:
+ * PropImageMenuItem:
  * @prop: IBus.Property
  *
  * This class creates popupMenu.PopupImageMenuItem from @prop and
  * also emits the signal of 'property-activate' when it's activated.
  */
-ImageShellMenuItem.prototype = {
+PropImageMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
     _init: function(prop) {
@@ -206,20 +318,20 @@ ImageShellMenuItem.prototype = {
     }
 };
 
-Signals.addSignalMethods(ImageShellMenuItem.prototype);
+Signals.addSignalMethods(PropImageMenuItem.prototype);
 
-function CheckShellMenuItem(prop) {
+function PropCheckMenuItem(prop) {
     this._init(prop);
 }
 
 /**
- * CheckShellMenuItem:
+ * PropCheckMenuItem:
  * @prop: IBus.Property
  *
  * This class creates popupMenu.PopupSwitchMenuItem from @prop and
  * also emits the signal of 'property-activate' when it's activated.
  */
-CheckShellMenuItem.prototype = {
+PropCheckMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
     _init: function(prop) {
@@ -299,21 +411,21 @@ CheckShellMenuItem.prototype = {
     }
 };
 
-Signals.addSignalMethods(CheckShellMenuItem.prototype);
+Signals.addSignalMethods(PropCheckMenuItem.prototype);
 
-function RadioShellMenuItem(group, prop) {
+function PropRadioMenuItem(group, prop) {
     this._init(group, prop);
 }
 
 /**
- * RadioShellMenuItem:
+ * PropRadioMenuItem:
  * @prop: IBus.Property
  *
  * This class creates popupMenu.PopupMenuItem from @prop and
  * handles a dot image as a radio button likes gtk.RadioMenuItem.
  * It also emits the signal of 'property-activate' when it's activated.
  */
-RadioShellMenuItem.prototype = {
+PropRadioMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
     _init: function(group, prop) {
@@ -416,18 +528,18 @@ RadioShellMenuItem.prototype = {
     }
 };
 
-Signals.addSignalMethods(RadioShellMenuItem.prototype);
+Signals.addSignalMethods(PropRadioMenuItem.prototype);
 
-function SeparatorShellMenuItem() {
+function PropSeparatorMenuItem() {
     this._init();
 }
 
 /**
- * SeparatorShellMenuItem:
+ * PropSeparatorMenuItem:
  *
  * This class creates popupMenu.PopupSeparatorMenuItem.
  */
-SeparatorShellMenuItem.prototype = {
+PropSeparatorMenuItem.prototype = {
     __proto__ : PropItem.PropItem.prototype,
 
     _init: function() {
@@ -445,4 +557,4 @@ SeparatorShellMenuItem.prototype = {
 };
 
 
-Signals.addSignalMethods(SeparatorShellMenuItem.prototype);
+Signals.addSignalMethods(PropSeparatorMenuItem.prototype);

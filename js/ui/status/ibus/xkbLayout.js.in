@@ -1,8 +1,8 @@
-/* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
+// -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 /*
- * Copyright 2011 Red Hat, Inc.
- * Copyright 2011 Peng Huang <shawn.p.huang@gmail.com>
- * Copyright 2011 Takao Fujiwara <tfujiwar@redhat.com>
+ * Copyright 2012 Red Hat, Inc.
+ * Copyright 2012 Peng Huang <shawn.p.huang@gmail.com>
+ * Copyright 2012 Takao Fujiwara <tfujiwar@redhat.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -23,11 +23,10 @@ const IBus = imports.gi.IBus;
 const Lang = imports.lang;
 
 const Config = imports.misc.config;
-const Util = imports.misc.util;
 
-const XKB_SESSION_TIME_OUT = 30.0;
 const ICON_KEYBOARD = 'input-keyboard-symbolic';
-const DEFAULT_BRIDGE_ENGINE_NAME = 'xkb:layout:default:';
+const XKB_LAYOUTS_MAX_LENGTH = 4;
+const XKB_ENGINE_NAME_PREFIX = 'xkb:';
 const XMODMAP_CMD = 'xmodmap';
 const XMODMAP_KNOWN_FILES = ['.xmodmap', '.xmodmaprc', '.Xmodmap', '.Xmodmaprc'];
 
@@ -38,36 +37,27 @@ function XKBLayout(config, command) {
 
 XKBLayout.prototype = {
     _init: function(config) {
-        this._config = null;
-        this._command = Config.IBUS_XKB;
-        this._useXkb = Config.HAVE_IBUS_XKB;
+        this._config = config;
+        this._xkbCommand = Config.IBUS_XKB;
+        this._haveIBusXkb = Config.HAVE_IBUS_XKB;
         this._useXmodmap = true;
         this._xkbPid = -1;
         this._xmodmapPid = -1;
 
-        if (config != undefined) {
-            this._config = config;
-        }
-        if (this._command == null) {
-            this._useXkb = false;
-        }
-        if (this._useXkb == false) {
+        if (this._haveIBusXkb == false) {
+            this._xkbCommand = 'setxkbmap';
             this._useXmodmap = false;
         }
-        this._defaultLayout = this.getLayout();
-        this._defaultModel = this.getModel();
-        this._defaultOption = this.getOption();
-        /* If setDefaultLayout() is default, the default layout is
-         * pulled from the current XKB. But it's possible gnome-settings-daemon
-         * does not run yet. I added XKB_SESSION_TIME_OUT for the timer.
-         * The _timeLagSessionXkbTimer will be compared with
-         * XKB_SESSION_TIME_OUT.
-         * Maybe it would be good that IBusPanel is able to create
-         * IBus.Engines from gsettings of org.gnome.libgnomekbd.keyboard */
-        this._timeLagSessionXkbLayout = true;
-        this._timeLagSessionXkbOption = true;
-        this._timeLagSessionXkbTimer = 0;
-        GLib.test_timer_start();
+        if (this._xkbCommand == null) {
+            this._xkbCommand = 'setxkbmap';
+            this._haveIBusXkb = false;
+            this._useXmodmap = false;
+        }
+
+        this._defaultLayout = "";
+        this._defaultVariant = "";
+        this._defaultOption = "";
+
         this._xkbLatinLayouts = [];
         if (this._config != null) {
             let value = this._config.get_value('general',
@@ -86,14 +76,14 @@ XKBLayout.prototype = {
         }
     },
 
-    /* _getModelFromLayout:
-     * @layout: The format is 'layouts(models)[options]'
-     * @returns: ['layouts[options]', 'models']
+    /* _getVariantFromLayout:
+     * @layout: The format is 'layouts(variants)[options]'
+     * @returns: ['layouts[options]', 'variants']
      *
-     * Return the array of layouts and models from the formatted string.
+     * Return the array of layouts and variants from the formatted string.
      * Each element can be the comma separated values.
      */
-    _getModelFromLayout: function(layout) {
+    _getVariantFromLayout: function(layout) {
         let leftBracket = layout.indexOf('(');
         let rightBracket = layout.indexOf(')');
         if (leftBracket >= 0 && rightBracket > leftBracket) {
@@ -122,8 +112,8 @@ XKBLayout.prototype = {
 
     _getOutputFromCmdline: function(arg, str) {
         let retval = null;
-        let basename = GLib.path_get_basename(this._command);
-        let argv = [this._command, basename, arg];
+        let basename = GLib.path_get_basename(this._xkbCommand);
+        let argv = [this._xkbCommand, basename, arg];
         let [result, output, std_err, status] = this._spawnWithPipes(argv);
         if (!result) {
             return null;
@@ -154,6 +144,71 @@ XKBLayout.prototype = {
             }
         }
         return null;
+    },
+
+    _getXkbGroupLayout: function(layout, variant, layoutsMaxLength) {
+        let groupId = 0;
+        let i = 0;
+        let layouts = this._defaultLayout.split(',');
+        let variants = this._defaultVariant.split(',');
+        let groupLayouts = '';
+        let groupVariants = '';
+        let hasVariant = false;
+        let includeKeyMap = false;
+
+        for (i = 0; i < layouts.length; i++) {
+            if (i >= layoutsMaxLength - 1) {
+                break;
+            }
+
+            if (i == 0) {
+                groupLayouts = layouts[i];
+            } else {
+                groupLayouts = groupLayouts + ',' + layouts[i];
+            }
+
+            if (i >= variants.length) {
+                if (i == 0) {
+                    groupVariants = '';
+                } else {
+                    groupVariants += ',';
+                }
+                if (layout == layouts[i] && variant == '') {
+                    includeKeyMap = true;
+                    groupId = i;
+                }
+                continue;
+            }
+            if (layout == layouts[i] && variant == variants[i]) {
+                includeKeyMap = true;
+                groupId = i;
+            }
+
+            if (variants[i] != '') {
+                hasVariant = true;
+            }
+
+            if (i == 0) {
+                groupVariants = variants[i];
+            } else {
+                groupVariants = groupVariants + ',' + variants[i];
+            }
+        }
+
+        if (variant != '') {
+            hasVariant = true;
+        }
+
+        if (!includeKeyMap) {
+            groupLayouts = groupLayouts + ',' + layout;
+            groupVariants = groupVariants + ',' + variant;
+            groupId = i;
+        }
+
+        if (!hasVariant) {
+            groupVariants = null;
+        }
+        return [groupLayouts, groupVariants, groupId];
     },
 
     _setLayoutCB: function(pid, status, data) {
@@ -290,201 +345,157 @@ XKBLayout.prototype = {
         }
     },
 
-    useXkb: function(enable) {
-        if (this._command == null) {
-            return;
-        }
-        this._useXkb = enable;
-    },
-
     getLayout: function() {
-        if (!this._useXkb) {
-            return null;
+        if (this._haveIBusXkb) {
+            return this._getOutputFromCmdline('--get', 'layout: ');
+        } else {
+            return this._getOutputFromCmdline('-query', 'layout: ');
         }
-        return this._getOutputFromCmdline('--get', 'layout: ');
     },
 
-    getModel: function() {
-        if (!this._useXkb) {
-            return null;
+    getVariant: function() {
+        if (this._haveIBusXkb) {
+            return this._getOutputFromCmdline('--get', 'variant: ');
+        } else {
+            return this._getOutputFromCmdline('-query', 'variant: ');
         }
-        return this._getOutputFromCmdline('--get', 'model: ');
     },
 
     getOption: function() {
-        if (!this._useXkb) {
-            return null;
+        if (this._haveIBusXkb) {
+            return this._getOutputFromCmdline('--get', 'option: ');
+        } else {
+            return this._getOutputFromCmdline('-query', 'options: ');
         }
-        return this._getOutputFromCmdline('--get', 'option: ');
-    },
-
-    getGroup: function() {
-        if (!this._useXkb) {
-            return 0;
-        }
-        return this._getOutputFromCmdline('--get-group', 'group: ');
     },
 
     setLayout: function(layout) {
-        let model = 'default';
+        let variant = 'default';
         let option = 'default';
+        let xkbGroupId = 0;
+        let changedOption = false;
 
-        if (!this._useXkb) {
-            return;
-        }
         if (this._xkbPid != -1) {
-            return;
+            return [-1, false];
         }
-        if (layout == undefined) {
-            layout = 'default';
+        if (layout == undefined || layout == 'default') {
+            return [-1, false];
         }
-        if (this._defaultLayout == null) {
-            // Maybe opening display was failed in constructor.
-            this.reloadDefaultLayout();
-        }
-        if (this._defaultLayout == null) {
-            return;
-        }
-        if (this._timeLagSessionXkbLayout == true) {
-            this._defaultLayout = this.getLayout();
-            this._defaultModel = this.getModel();
-        }
-        if (this._timeLagSessionXkbOption == true) {
-            this._defaultOption = this.getOption();
-        }
-        if ((this._timeLagSessionXkbLayout == true ||
-             this._timeLagSessionXkbOption == true) &&
-            (GLib.test_timer_elapsed() - this._timeLagSessionXkbTimer
-             > XKB_SESSION_TIME_OUT)) {
-            this._timeLagSessionXkbLayout = false;
-            this._timeLagSessionXkbOption = false;
-        }
-        let isDefaultLayout = false;
-        if (layout == 'default') {
-            isDefaultLayout = true;
-            layout = this._defaultLayout;
-        } else {
-            this._timeLagSessionXkbLayout = false;
-        }
-        [layout, model] = this._getModelFromLayout(layout);
-        if (model == 'default') {
-            if (isDefaultLayout) {
-                model = this._defaultModel;
-            } else {
-                model = null;
-            }
-        } else {
-            this._timeLagSessionXkbLayout = false;
-        }
-        let engineOption = 'default';
-        [layout, engineOption] = this._getOptionFromLayout(layout);
-        if (engineOption != null && engineOption != 'default') {
-            option = this._defaultOption;
-            if (option == null) {
-                    option = engineOption;
-            } else {
-                    option = option + ',' + engineOption;
-            }
-            this._timeLagSessionXkbOption = false;
-        }
-        if (option == 'default') {
-            option = this._defaultOption;
-        }
+
+        [layout, variant] = this._getVariantFromLayout(layout);
+        [layout, option] = this._getOptionFromLayout(layout);
+
         let needUsLayout = false;
         for (let i = 0; i < this._xkbLatinLayouts.length; i ++) {
             let latinLayout = this._xkbLatinLayouts[i];
-            // layout 'in' and model 'eng' is English layout.
-            if (layout == latinLayout && model != 'eng') {
+            // layout 'in' and variant 'eng' is English layout.
+            if (layout == latinLayout && variant != 'eng') {
                 needUsLayout = true;
                 break;
             }
-            if (model != null && layout + '(' + model + ')' == latinLayout) {
+
+            if (variant != null && layout + '(' + variant + ')' == latinLayout) {
                 needUsLayout = true;
                 break;
             }
         }
+
+        let layoutsMaxLength = XKB_LAYOUTS_MAX_LENGTH;
+        if (needUsLayout) {
+            layoutsMaxLength--;
+        }
+
+        if (this._defaultLayout == '') {
+            this._defaultLayout = this.getLayout();
+        }
+        if (this._defaultVariant == '') {
+            this._defaultVariant = this.getVariant();
+        }
+        if (this._defaultOption == '') {
+            this._defaultOption = this.getOption();
+        }
+
+        if (layout == 'default') {
+            layout = this._defaultLayout;
+            variant = this._defaultVariant;
+        } else {
+            if (variant == 'default') {
+                variant = '';
+            }
+            [layout, variant, xkbGroupId] = this._getXkbGroupLayout(layout,
+                                                                    variant,
+                                                                    layoutsMaxLength);
+        }
+
+        if (layout == '') {
+            global.log('Could not get the correct layout');
+            return [-1, false];
+        }
+
+        if (variant == 'default' || variant == '') {
+            variant = null;
+        }
+
+        if (option == 'default' || option == '') {
+            option = this._defaultOption;
+        } else {
+            let includeOption = false;
+            for (let j = 0; j < this._defaultOption.length; j++) {
+                if (option == this._defaultOption[j]) {
+                    includeOption = true;
+                    break;
+                }
+            }
+
+            if (!includeOption) {
+                option = this._defaultOption + ',' + option;
+                changedOption = true;
+            } else {
+                option = this._defaultOption;
+            }
+        }
+
+        if (option == '') {
+            option = null;
+        }
+
         if (needUsLayout) {
             layout = layout + ',us';
-            if (model != null) {
-                model = model + ',';
+            if (variant != null) {
+                variant = variant + ',';
             }
         }
-        if (layout == this.getLayout() &&
-            model == this.getModel() &&
-            option == this.getOption()) {
-            return;
-        }
+
         let args = [];
-        args.push(this._command);
-        args.push('--layout');
-        args.push(layout);
-        if (model != null) {
-            args.push('--model');
-            args.push(model);
+        args.push(this._xkbCommand);
+        if (this._haveIBusXkb) {
+            args.push('--layout');
+            args.push(layout);
+            if (variant != null) {
+                args.push('--variant');
+                args.push(variant);
+            }
+            if (option != null) {
+                args.push('--option');
+                args.push(option);
+            }
+        } else {
+            args.push(layout);
+            if (variant != null) {
+                args.push(variant);
+            }
+            if (option != null) {
+                args.push(option);
+            }
         }
-        if (option != null) {
-            args.push('--option');
-            args.push(option);
-        }
+
         this._spawnAsyncXkb(args);
+        return [xkbGroupId, changedOption];
     },
 
-    getDefaultLayout: function() {
-        return [this._defaultLayout, this._defaultModel];
-    },
-
-    getDefaultOption: function() {
-        return this._defaultOption;
-    },
-
-    setDefaultLayout: function(layout, model) {
-        if (!this._useXkb) {
-            return;
-        }
-        if (layout == undefined) {
-            layout = 'default';
-        }
-        if (model == undefined) {
-            model = 'default';
-        }
-        if (layout == 'default') {
-            this._defaultLayout = this.getLayout();
-            this._defaultModel = this.getModel();
-        } else {
-            if (model == 'default') {
-                [layout, model] = this._getModelFromLayout(layout);
-            }
-            this._defaultLayout = layout;
-            this._timeLagSessionXkbLayout = false;
-            if (model == 'default') {
-                this._defaultModel = null;
-            } else {
-                this._defaultModel = model;
-            }
-        }
-    },
-
-    setDefaultOption: function(option) {
-        if (!this._useXkb) {
-            return;
-        }
-        if (option == undefined) {
-            option = 'default';
-        }
-        if (option == 'default') {
-            this._defaultOption = this.getOption();
-        } else {
-            this._defaultOption = option;
-            this._timeLagSessionXkbOption = false;
-        }
-    },
-
-    reloadDefaultLayout: function() {
-        if (!this._useXkb) {
-            return;
-        }
+    resetLayout: function() {
         this._defaultLayout = this.getLayout();
-        this._defaultModel = this.getModel();
+        this._defaultVariant = this.getVariant();
         this._defaultOption = this.getOption();
     },
 
@@ -492,19 +503,23 @@ XKBLayout.prototype = {
         if (!this._useXmodmap) {
             return;
         }
+
         if (this._xmodmapPid != -1) {
             return;
         }
+
         let xmodmapCmdPath = this._getFullPath(XMODMAP_CMD);
         if (xmodmapCmdPath == null) {
             xmodmapCmdPath = XMODMAP_CMD;
         }
+
         for (let i = 0; i < XMODMAP_KNOWN_FILES.length; i++) {
             let xmodmapFile = XMODMAP_KNOWN_FILES[i];
             let xmodmapFilePath = GLib.get_home_dir() + '/' + xmodmapFile;
             if (!GLib.file_test(xmodmapFilePath, GLib.FileTest.EXISTS)) {
                 continue;
             }
+
             let args = [];
             args.push(xmodmapCmdPath);
             args.push(xmodmapFilePath);
@@ -545,15 +560,8 @@ function engineDescNew(lang, layout, layoutDesc,
     }
 
     let icon = 'ibus-engine';
-    let defaultBridgeEngineName = DEFAULT_BRIDGE_ENGINE_NAME;
-    try {
-        defaultBridgeEngineName = IBus.get_default_bridge_engine_name();
-    } catch (e) {
-        // This feature is not available.
-    }
-
-    if (name.substring(0, defaultBridgeEngineName.length)
-        == defaultBridgeEngineName) {
+    if (name.substring(0, XKB_ENGINE_NAME_PREFIX.length)
+        == XKB_ENGINE_NAME_PREFIX) {
         icon = ICON_KEYBOARD;
     }
 
