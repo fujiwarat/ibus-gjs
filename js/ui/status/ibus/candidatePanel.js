@@ -51,7 +51,7 @@ StCandidateArea.prototype = {
     },
 
     _removeOldWidgets: function() {
-        this.actor.destroy_children();
+        this.actor.destroy_all_children();
         this._labels = [];
         this._labelBoxes = [];
     },
@@ -62,19 +62,19 @@ StCandidateArea.prototype = {
         if (this._orientation == Common.ORIENTATION_VERTICAL) {
             vbox = new St.BoxLayout({ vertical: true,
                                       style_class: 'candidate-vertical' });
-            this.actor.add(vbox,
-                           { expand: true, 
-                             x_fill: true,
-                             y_fill: true
-                           });
+            this.actor.add_child(vbox,
+                                 { expand: true, 
+                                   x_fill: true,
+                                   y_fill: true
+                                 });
         } else {
             hbox = new St.BoxLayout({ vertical: false,
                                       style_class: 'candidate-horizontal' });
-            this.actor.add(hbox,
-                           { expand: true, 
-                             x_fill: true,
-                             y_fill: true
-                           });
+            this.actor.add_child(hbox,
+                                 { expand: true, 
+                                   x_fill: true,
+                                   y_fill: true
+                                 });
         }
         for (let i = 0; i < 16; i++) {
             let label1 = new St.Label({ text: '1234567890abcdef'.charAt(i) + '.',
@@ -96,24 +96,24 @@ StCandidateArea.prototype = {
 
                 textBox.set_child(label2);
                 textBox.set_fill(true, true);
-                candidateHBox.add(labelBox,
-                                   { expand: false,
-                                     x_fill: false,
-                                     y_fill: true
-                                   });
-                candidateHBox.add(textBox,
-                                   { expand: true,
-                                     x_fill: true,
-                                     y_fill: true
-                                   });
-                vbox.add(candidateHBox);
+                candidateHBox.add_child(labelBox,
+                                        { expand: false,
+                                          x_fill: false,
+                                          y_fill: true
+                                        });
+                candidateHBox.add_child(textBox,
+                                        { expand: true,
+                                          x_fill: true,
+                                          y_fill: true
+                                        });
+                vbox.add_child(candidateHBox);
                 this._labelBoxes.push(candidateHBox);
             } else {
                 let candidateHBox = new St.BoxLayout({ style_class: 'candidate-vcontent',
                                                        vertical: false });
-                candidateHBox.add(label1);
-                candidateHBox.add(label2);
-                hbox.add(candidateHBox);
+                candidateHBox.add_child(label1);
+                candidateHBox.add_child(label2);
+                hbox.add_child(candidateHBox);
                 this._labelBoxes.push(candidateHBox);
             }
 
@@ -292,26 +292,26 @@ CandidatePanel.prototype = {
     },
 
     _packAllStWidgets: function() {
-        this._stCandidatePanel.add(this._stPreeditLabel,
-                                   {x_fill: true,
-                                    y_fill: false,
-                                    x_align: St.Align.MIDDLE,
-                                    y_align: St.Align.START});
-        this._stCandidatePanel.add(this._stAuxLabel,
-                                   {x_fill: true,
-                                    y_fill: false,
-                                    x_align: St.Align.MIDDLE,
-                                    y_align: St.Align.MIDDLE});
-        this._stCandidatePanel.add(this._separator.actor,
-                                   {x_fill: true,
-                                    y_fill: false,
-                                    x_align: St.Align.MIDDLE,
-                                    y_align: St.Align.MIDDLE});
-        this._stCandidatePanel.add(this._stCandidateArea.actor,
-                                   {x_fill: true,
-                                    y_fill: false,
-                                    x_align: St.Align.MIDDLE,
-                                    y_align: St.Align.END});
+        this._stCandidatePanel.add_child(this._stPreeditLabel,
+                                         { x_fill: true,
+                                           y_fill: false,
+                                           x_align: St.Align.MIDDLE,
+                                           y_align: St.Align.START });
+        this._stCandidatePanel.add_child(this._stAuxLabel,
+                                         { x_fill: true,
+                                           y_fill: false,
+                                           x_align: St.Align.MIDDLE,
+                                           y_align: St.Align.MIDDLE });
+        this._stCandidatePanel.add_child(this._separator.actor,
+                                         { x_fill: true,
+                                           y_fill: false,
+                                           x_align: St.Align.MIDDLE,
+                                           y_align: St.Align.MIDDLE });
+        this._stCandidatePanel.add_child(this._stCandidateArea.actor,
+                                         { x_fill: true,
+                                           y_fill: false,
+                                           x_align: St.Align.MIDDLE,
+                                           y_align: St.Align.END });
     },
 
     showPreeditText: function() {

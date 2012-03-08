@@ -29,7 +29,7 @@ AC_CONFIG_MACRO_DIR([m4])
 m4_define([ibus_released], [0])
 m4_define([ibus_major_version], [3])
 m4_define([ibus_minor_version], [3])
-m4_define([ibus_micro_version], [3])
+m4_define([ibus_micro_version], [90])
 m4_define(ibus_maybe_datestamp,
     m4_esyscmd([if test x]ibus_released[ != x1; then date +.%Y%m%d | tr -d '\n\r'; fi]))
 m4_define([ibus_version],
