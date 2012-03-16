@@ -129,8 +129,8 @@ IBusPanel.prototype = {
         // init xkb
         this._initEnginesOrder();
         if (this._config != null) {
-            this._updateEngines(this._config.get_value('general', 'preload_engines', []),
-                                this._config.get_value('general', 'engines_order', []));
+            this._updateEngines(this._config.get_value('general', 'preload_engines'),
+                                this._config.get_value('general', 'engines_order'));
         } else {
             this._switchEngine(0, true);
         }
@@ -187,7 +187,44 @@ IBusPanel.prototype = {
         this._xkblayout = new XKBLayout.XKBLayout(this._config);
         this._initGkbd();
 
+        let varEngines = (this._config != null) ?
+            this._config.get_value('general', 'preload_engines') : null;
+        let preloadEngines = (varEngines != null) ?
+            varEngines.dup_strv() : [];
+
+        let varPreloadEnginesInited = (this._config != null) ?
+            this._config.get_value('general', 'preload_engines_inited') : null;
+        let preloadEnginesInited = (varPreloadEnginesInited != null) ?
+            varPreloadEnginesInited.get_boolean() : false;
+
+        // Set preloadEnginesInited = true for back compatibility
+        if (this._config != null &&
+            preloadEngines.length != 0 && !preloadEnginesInited) {
+                preloadEnginesInited = true;
+                this._config.set_value('general',
+                                       'preload_engines_inited',
+                                       GLib.Variant.new_boolean(true));
+        }
+
         this._updateXkbEngines();
+
+        // Before update preloadEngineMode, updateXkbEngines() is called
+        // because config_value_changed_cb() calls updateIMEngines().
+        if (this._config != null && !preloadEnginesInited) {
+            let variant = GLib.Variant.new_int32(
+                    IBus.PreloadEngineMode.LANG_RELATIVE);
+            this._config.set_value('general',
+                                   'preload_engine_mode',
+                                   variant);
+        }
+
+        this._updateIMEngines();
+
+        if (this._config != null && !preloadEnginesInited) {
+            this._config.set_value('general',
+                                   'preload_engines_inited',
+                                   GLib.Variant.new_boolean(true));
+        }
 
         return true;
     },
@@ -197,6 +234,100 @@ IBusPanel.prototype = {
         this._gkbdlayout.connect('changed', Lang.bind(this, this._syncGroup));
         GLib.test_timer_start();
         this._gkbdlayout.start_listen();
+    },
+
+    _setLangRelativePreloadEngines: function() {
+        /* Either $LANG or get_language_names are not correct.
+         * Currently there is no way to get LC_CTYPE.
+         */
+        let locale = GLib.getenv('LANG');
+        if (locale == null) {
+            let langs = GLib.get_language_names();
+            locale = (langs.length > 0) ? langs[0] : 'C';
+        }
+
+        let lang = locale.split('.')[0];
+        let engines = this._bus.list_engines();
+        let imEngines = [];
+
+        for (let i = 0; i < engines.length; i++) {
+            let engine = engines[i];
+            if (engine.language == lang &&
+                engine.rank > 0) {
+                imEngines.push(engine.name);
+            }
+        }
+
+        lang = lang.split('_')[0];
+        if (imEngines.length == 0) {
+            for (let i = 0; i < engines.length; i++) {
+                let engine = engines[i];
+                if (engine.language == lang &&
+                    engine.rank > 0) {
+                    imEngines.push(engine.name);
+                }
+            }
+        }
+
+        if (imEngines.length == 0) {
+            return false;
+        }
+
+        let varEngines = this._config.get_value('general', 'preload_engines');
+        let preloadEngines = [];
+        let origPreloadEngines = (varEngines != null) ?
+            varEngines.dup_strv() : [];
+
+        // clear input method engines
+        for (let i = 0; i < origPreloadEngines.length; i++) {
+            let name = origPreloadEngines[i];
+            if (name.substring(0, 4) != 'xkb:') {
+                continue;
+            }
+            preloadEngines.push(name);
+        }
+
+        for (let i = 0; i < imEngines.length; i++) {
+            let name = imEngines[i];
+            let j = 0;
+
+            for (j = 0; j < preloadEngines.length; j++) {
+                if (name == preloadEngines[j]) {
+                    break;
+                }
+            }
+
+            if (j < preloadEngines.length) {
+                continue;
+            }
+
+            preloadEngines.push(name);
+        }
+
+        if (origPreloadEngines.join(',') != preloadEngines.join(',')) {
+            this._config.set_value('general',
+                                   'preload_engines',
+                                   GLib.Variant.new_strv(preloadEngines));
+        }
+
+        return true;
+    },
+
+    _updateIMEngines: function() {
+        if (this._config == null) {
+            return;
+        }
+
+        let var_preload_engine_mode =
+            this._config.get_value('general', 'preload_engine_mode');
+        let preload_engine_mode = (var_preload_engine_mode != null) ?
+            var_preload_engine_mode.get_int32() : IBus.PreloadEngineMode.USER;
+
+        if (preload_engine_mode == IBus.PreloadEngineMode.USER) {
+            return;
+        }
+
+        this._setLangRelativePreloadEngines();
     },
 
     _updateXkbEngines: function() {
@@ -219,7 +350,7 @@ IBusPanel.prototype = {
             let langs = null;
             let lang = null;
             let variant = null;
-            if (i < this._variants.length && this._variants[i] != "") {
+            if (i < this._variants.length && this._variants[i] != '') {
                 name += ':' + this._variants[i];
                 variant = this._variants[i];
                 let layout = name + '(' + this._variants[i] + ')';
@@ -241,7 +372,7 @@ IBusPanel.prototype = {
             if (this._config == null) {
                 let name = 'xkb:' + name + ':' + lang;
                 let description = null;
-                if (i < descriptions.length && descriptions[i] != "") {
+                if (i < descriptions.length && descriptions[i] != '') {
                     description = descriptions[i];
                 }
                 var engine = XKBLayout.engineDescNew(lang,
@@ -282,7 +413,7 @@ IBusPanel.prototype = {
                 continue;
             }
 
-            let isUpdatedEngineNames = true;
+            isUpdatedEngineNames = true;
             engineNames.push(name);
         }
 
@@ -291,7 +422,7 @@ IBusPanel.prototype = {
                                    GLib.Variant.new_strv(engineNames));
         }
 
-        let varOrder = this._config.get_value('general', 'engines_order', null);
+        let varOrder = this._config.get_value('general', 'engines_order');
         let orderNames = (varOrder != null) ? varOrder.dup_strv() : [];
         let isUpdatedOrderNames = false;
 
@@ -308,8 +439,8 @@ IBusPanel.prototype = {
                 continue;
             }
 
-            orderNames.push(name);
             isUpdatedOrderNames = true;
+            orderNames.push(name);
         }
 
         if (isUpdatedOrderNames) {
@@ -513,13 +644,21 @@ IBusPanel.prototype = {
         }
     },
 
-    _configValueChangedCB: function(bus, section, name, value) {
-        global.log ('config changed:' + section + '-' + name + ':' + value);
-        if (section != 'panel') {
+    _configValueChangedCB: function(bus, section, name, variant) {
+        global.log ('config changed:' + section + '-' + name + ':' + variant);
+        if (section == 'general' && name == 'preload_engine_mode') {
+            this._updateIMEngines();
             return;
         }
-        if (name == 'lookup_table_orientation') {
+
+        if (section == 'general' && name == 'preload_engines') {
+            this._updateEngines(variant, null);
+            return;
+        }
+
+        if (section == 'panel' && name == 'lookup_table_orientation') {
             this._configLoadLookupTableOrientation();
+            return;
         }
     },
 

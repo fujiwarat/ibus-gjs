@@ -122,7 +122,7 @@ ImageShellMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setLabel: function(label) {
@@ -223,7 +223,7 @@ ToggleShellMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setShowDot: function(show) {
@@ -338,7 +338,7 @@ RadioShellMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setLabel: function(label) {
@@ -437,7 +437,7 @@ SeparatorShellMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     destroy: function() {
@@ -685,7 +685,7 @@ SubMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     }
 }
 

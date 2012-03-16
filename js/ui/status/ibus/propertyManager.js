@@ -306,7 +306,7 @@ PropImageMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.item.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setSubmenu: function(submenu) {
@@ -399,7 +399,7 @@ PropCheckMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.item.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setSubmenu: function(submenu) {
@@ -493,7 +493,7 @@ PropRadioMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.item.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setSubmenu: function(submenu) {
