@@ -194,7 +194,7 @@ ImageShellMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.item.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setSubmenu: function(submenu) {
@@ -287,7 +287,7 @@ CheckShellMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.item.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setSubmenu: function(submenu) {
@@ -381,7 +381,7 @@ RadioShellMenuItem.prototype = {
     },
 
     setTooltipText: function(text) {
-        this.item.actor.set_tooltip_text(text);
+        // StWidget.set_tooltip_text was deleted.
     },
 
     setSubmenu: function(submenu) {
