@@ -1,3 +1,9 @@
+ibus-gjs (3+ubuntu03) precise; urgency=low
+
+  * FIX no destroy_children and depends
+
+ -- Meng Zhuo <mengzhuo1203@gmail.com>  Sat, 31 Mar 2012 10:02:06 +0800
+ 
 ibus-gjs (3+ubuntu02) oneiric; urgency=low
 
   * Change Logs
