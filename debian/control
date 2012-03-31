@@ -14,5 +14,5 @@ Homepage: https://github.com/fujiwarat/ibus-gjs
 
 Package: ibus-gjs
 Architecture: any
-Depends: ${misc:Depends}
+Depends: ${misc:Depends},gir1.2-ibus-1.0
 Description: Add a system status menu for input-methods using IBus
