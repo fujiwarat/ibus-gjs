@@ -51,7 +51,7 @@ StCandidateArea.prototype = {
     },
 
     _removeOldWidgets: function() {
-        this.actor.destroy_children();
+        this.actor.destroy_all_children();
         this._labels = [];
         this._labelBoxes = [];
     },
