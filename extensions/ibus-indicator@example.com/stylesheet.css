@@ -2,6 +2,7 @@
     min-width: 100px;
     padding: .5em;
     spacing: 0;
+    font-size: 11pt;
 }
 
 .candidate-area {
@@ -22,4 +23,10 @@
 
 .candidate-vcontent {
     padding: 0em .5em 0em 0em;
+}
+.enumerator-list {
+    padding: .1em 0em;
+}
+.candidate-list {
+    padding: .1em 0em;
 }

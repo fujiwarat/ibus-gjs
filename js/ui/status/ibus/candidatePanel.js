@@ -4,6 +4,7 @@
  * Copyright 2011 Peng Huang <shawn.p.huang@gmail.com>
  * Copyright 2011 Takao Fujiwara <tfujiwar@redhat.com>
  * Copyright 2011 Tiger Soldier <tigersoldi@gmail.com>
+ * Copyright 2012 Meng Zhuo <mengzhuo1203@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as
@@ -32,11 +33,6 @@ const BoxPointer = imports.ui.boxpointer;
 
 const Common = imports.ui.status.ibus.common;
 
-const topLabelStyle = 'padding: .1em 0em';
-const candidateLabelStyle = 'padding: .1em 0em .1em 0em';
-const candidateTextStyle = 'padding: .1em 0em .1em 0em';
-const separatorStyle = 'height: 2px; padding: 0em';
-
 function StCandidateArea(orientation) {
     this._init(orientation);
 }
@@ -51,7 +47,7 @@ StCandidateArea.prototype = {
     },
 
     _removeOldWidgets: function() {
-        this.actor.destroy_children();
+        this.actor.destroy_all_children();
         this._labels = [];
         this._labelBoxes = [];
     },
@@ -78,13 +74,11 @@ StCandidateArea.prototype = {
         }
         for (let i = 0; i < 16; i++) {
             let label1 = new St.Label({ text: '1234567890abcdef'.charAt(i) + '.',
-                                        style_class: 'popup-menu-item',
-                                        style: candidateLabelStyle,
+                                        style_class: 'enumerator-list',
                                         reactive: true });
 
             let label2 = new St.Label({ text: '' ,
-                                        style_class: 'popup-menu-item',
-                                        style: candidateTextStyle,
+                                        style_class: 'candidate-list',
                                         reactive: true });
 
             if (this._orientation == Common.ORIENTATION_VERTICAL) {
@@ -260,13 +254,12 @@ CandidatePanel.prototype = {
         this._boxPointer.bin.set_child(this._stCandidatePanel);
 
         this._stPreeditLabel = new St.Label({ style_class: 'popup-menu-item',
-                                              style: topLabelStyle,
                                               text: '' });
+        
         if (!this._preeditVisible) {
             this._stPreeditLabel.hide();
         }
         this._stAuxLabel = new St.Label({ style_class: 'popup-menu-item',
-                                          style: topLabelStyle,
                                           text: '' });
         if (!this._auxVisible) {
             this._stAuxLabel.hide();
@@ -603,8 +596,7 @@ function Separator() {
 
 Separator.prototype = {
     _init: function() {
-        this.actor = new St.DrawingArea({ style_class: 'popup-separator-menu-item',
-                                          style: separatorStyle });
+        this.actor = new St.DrawingArea({ style_class: 'popup-separator-menu-item' });
         this.actor.connect('repaint', Lang.bind(this, this._onRepaint));
     },
 
