@@ -136,7 +136,7 @@ IBusPanel.prototype = {
         }
 
         global.display.add_keybinding(KEY_TRIGGER,
-                                      SCHEMA_HOTKEY,
+                                      new Gio.Settings({ schema: SCHEMA_HOTKEY }),
                                       Meta.KeyBindingFlags.REVERSES,
                                       Lang.bind(this, this._handleEngineSwitch),
                                       1,
