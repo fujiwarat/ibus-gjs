@@ -42,7 +42,10 @@ const ICON_ENGINE = 'ibus-engine';
 const SCHEMA_HOTKEY = 'org.freedesktop.ibus.general.hotkey';
 const SECTION_HOTKEY = 'general/hotkey';
 const KEY_TRIGGER = 'trigger-accel';
+const KEY_TRIGGER_SHIFT = 'trigger-shift';
+const KEY_TRIGGER_KO = 'trigger-ko';
 const LAYOUTS_MAX_LENGTH = 4;
+const ACCELERATOR_SWITCH_IME_FOREWARD = '<Control>space';
 
 function IBusPanel(bus, indicator) {
     this._init(bus, indicator);
@@ -137,10 +140,11 @@ IBusPanel.prototype = {
 
         global.display.add_keybinding(KEY_TRIGGER,
                                       new Gio.Settings({ schema: SCHEMA_HOTKEY }),
-                                      Meta.KeyBindingFlags.REVERSES,
+                                      Meta.KeyBindingFlags.NONE,
                                       Lang.bind(this, this._handleEngineSwitch),
                                       1,
                                       null);
+        this._initTriggerKeys();
         return true;
     },
 
@@ -227,6 +231,85 @@ IBusPanel.prototype = {
         }
 
         return true;
+    },
+
+    _initTriggerKeys: function() {
+        if (this._config == null) {
+            return;
+        }
+
+        let varTrigger = this._config.get_value('general/hotkey',
+                                                'trigger_accel');
+        let triggers = varTrigger ? varTrigger.dup_strv() : [];
+        let triggersShift = [];
+
+        /* FIXME: ibus supports multiple trigger keys in 'trigger_accel'
+         * to switch ibus engines and some trigger keys have modifiers
+         * and other do not.
+         * Currently meta_display_add_keybinding() assigns the
+         * shift reverse by key. I created a new key 'trigger_shift'
+         * and modifier trigger keys are copied to the value here. */
+        let updatedTriggersShift = false;
+        for (let i = 0; i < triggers.length; i++) {
+            /* meta_ui_parse_accelerator() is not available on GJS and
+             * Gtk.accelerator_parse is not recommended. */
+            let lindex = triggers[i].indexOf('<');
+            let rindex = triggers[i].indexOf('>');
+            if (lindex >= 0 && rindex > lindex + 1 &&
+                triggers[i].substring(lindex + 1, rindex).toLowerCase() != 'shift') {
+                let j = 0;
+                for (j = 0; j < triggersShift.length; j++) {
+                    if (triggers[i] == triggersShift[j]) {
+                        break;
+                    }
+                }
+
+                if (j >= triggersShift.length) {
+                    triggersShift.push(triggers[i]);
+                    updatedTriggersShift = true;
+                }
+            }
+        }
+
+        if (updatedTriggersShift) {
+            this._config.set_value('general/hotkey', 'trigger_shift',
+                                   GLib.Variant.new_strv(triggersShift));
+            global.display.add_keybinding(KEY_TRIGGER,
+                                          new Gio.Settings({ schema: SCHEMA_HOTKEY }),
+                                          Meta.KeyBindingFlags.REVERSES,
+                                          Lang.bind(this, this._handleEngineSwitch),
+                                          2,
+                                          null);
+        }
+
+        if (!(triggers.length == 1 &&
+              triggers[0] == ACCELERATOR_SWITCH_IME_FOREWARD)) {
+            return;
+        }
+
+        /* Either $LANG or get_language_names are not correct.
+         * Currently there is no way to get LC_CTYPE.
+         */
+        let locale = GLib.getenv('LANG');
+        if (locale == null) {
+            let langs = GLib.get_language_names();
+            locale = (langs.length > 0) ? langs[0] : 'C';
+        }
+
+        if (locale.substring(0, 2) == 'ko') {
+            global.display.add_keybinding(KEY_TRIGGER_KO,
+                                          new Gio.Settings({ schema: SCHEMA_HOTKEY }),
+                                          Meta.KeyBindingFlags.NONE,
+                                          Lang.bind(this, this._handleEngineSwitch),
+                                          3,
+                                          null);
+        }
+
+        /* FIXME: if locale.substring(0, 2) == 'ja', I'd like to use 
+         * Zenkaku_Hankaku but Zenkaku_Hankaku and grave have the 
+         * same keycode. So grave cannot be typed on US keyboard
+         * if Zenkaku_Hankaku is enabled.
+         */
     },
 
     _initGkbd: function() {
@@ -450,10 +533,8 @@ IBusPanel.prototype = {
     },
 
     _updateEngines: function(varEngines, varOrder) {
-        let engineNames = null;
-        if (varEngines != null) {
-            engineNames = varEngines.dup_strv();
-        }
+        let engineNames = (varOrder != null) ? varEngines.dup_strv() : [];
+
         if (engineNames == null || engineNames.length == 0) {
             engineNames = ['xkb:us::eng'];
         }
@@ -573,6 +654,7 @@ IBusPanel.prototype = {
 
         if (this._xkblayout == null) {
             this._initEnginesOrder();
+            this._initTriggerKeys();
         }
 
         if (this._setGkbdLayout(layout)) {
@@ -618,13 +700,18 @@ IBusPanel.prototype = {
 
     _handleEngineSwitch: function(display, screen, window, binding, data) {
         let name = binding.get_name();
-        if (name != 'trigger-accel') {
+        if (name.substring(0, 7) != 'trigger') {
             global.log('Wrong name is binded ' + name);
             return;
         }
         let modifiers = binding.get_modifiers();
         let backwards = modifiers & Meta.VirtualModifier.SHIFT_MASK;
         let switcher = new Switcher.Switcher(this);
+        /* FIXME: Need to get the keysym.
+         * MetaKeyHandlerFunc does not provide keysym but we have
+         * the same keycode with different keysyms switching XKB layouts.
+         * E.g. grave on US keyboard and Zenkaku_Hankaku on JP keyboard 
+         * have the same keycode. */
 
         switcher.connect('engine-activated',
                          Lang.bind (this, function (object, name) {
