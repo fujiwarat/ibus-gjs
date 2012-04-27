@@ -18,6 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+const Clutter = imports.gi.Clutter;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Gkbd = imports.gi.Gkbd;
@@ -47,6 +48,18 @@ const KEY_TRIGGER_KO = 'trigger-ko';
 const LAYOUTS_MAX_LENGTH = 4;
 const ACCELERATOR_SWITCH_IME_FOREWARD = '<Control>space';
 
+function Keybinding(accelerator, keysym, modifiers) {
+    this._init(accelerator, keysym, modifiers);
+}
+
+Keybinding.prototype = {
+    _init: function(accelerator, keysym, modifiers) {
+        this.accelerator = accelerator;
+        this.keysym = keysym;
+        this.modifiers = modifiers;
+    }
+};
+
 function IBusPanel(bus, indicator) {
     this._init(bus, indicator);
 }
@@ -63,6 +76,8 @@ IBusPanel.prototype = {
         this._gkbdlayout = null;
         this._fallbackLockID = -1;
         this._changedXkbOption = false;
+        this._keybindings = [];
+        this._isSwitcherRunning = false;
 
         if (!this._initBus(bus)) {
             return;
@@ -138,10 +153,13 @@ IBusPanel.prototype = {
             this._switchEngine(0, true);
         }
 
+        global.stage.connect('captured-event',
+                             Lang.bind(this, this._globalKeyPressHandler));
+
         global.display.add_keybinding(KEY_TRIGGER,
                                       new Gio.Settings({ schema: SCHEMA_HOTKEY }),
                                       Meta.KeyBindingFlags.NONE,
-                                      Lang.bind(this, this._handleEngineSwitch),
+                                      Lang.bind(this, this._triggerKeyHandler),
                                       1,
                                       null);
         this._initTriggerKeys();
@@ -233,6 +251,74 @@ IBusPanel.prototype = {
         return true;
     },
 
+    _accelerator_parse: function(accelerator) {
+        let keysym = 0;
+        let modifiers = 0;
+        let accel = accelerator;
+        let lindex = accel.indexOf('<');
+        let rindex = accel.indexOf('>');
+
+        while (lindex >= 0 && rindex > lindex + 1) {
+            let name = accel.substring(lindex + 1, rindex).toLowerCase();
+            if (name == 'release') {
+                modifiers |= IBus.ModifierType.RELEASE_MASK;
+            }
+            else if (name == 'primary') {
+                modifiers |= IBus.ModifierType.CONTROL_MASK;
+            }
+            else if (name == 'control') {
+                modifiers |= IBus.ModifierType.CONTROL_MASK;
+            }
+            else if (name == 'shift') {
+                modifiers |= IBus.ModifierType.SHIFT_MASK;
+            }
+            else if (name == 'shft') {
+                modifiers |= IBus.ModifierType.SHIFT_MASK;
+            }
+            else if (name == 'ctrl') {
+                modifiers |= IBus.ModifierType.CONTROL_MASK;
+            }
+            else if (name.substring(0, 3) == 'mod') {
+                let mod_vals = [
+                    IBus.ModifierType.MOD1_MASK,
+                    IBus.ModifierType.MOD2_MASK,
+                    IBus.ModifierType.MOD3_MASK,
+                    IBus.ModifierType.MOD4_MASK,
+                    IBus.ModifierType.MOD5_MASK];
+                modifiers |= mod_vals[name[3] - '1'];
+            }
+            else if (name == 'ctl') {
+                modifiers |= IBus.ModifierType.CONTROL_MASK;
+            }
+            else if (name == 'alt') {
+                modifiers |= IBus.ModifierType.MOD1_MASK;
+            }
+            else if (name == 'meta') {
+                modifiers |= IBus.ModifierType.META_MASK;
+            }
+            else if (name == 'hyper') {
+                modifiers |= IBus.ModifierType.HYPER_MASK;
+            }
+            else if (name == 'super') {
+                modifiers |= IBus.ModifierType.SUPER_MASK;
+            }
+            accel = accel.substring(rindex + 1, accel.length);
+
+            if (accel == null || accel.length == 0) {
+                break;
+            }
+
+            lindex = accel.indexOf('<');
+            rindex = accel.indexOf('>');
+        }
+
+        if (accel != null && accel.length != 0) {
+            keysym = IBus.keyval_from_name(accel);
+        }
+
+        return [keysym, modifiers];
+    },
+
     _initTriggerKeys: function() {
         if (this._config == null) {
             return;
@@ -251,12 +337,11 @@ IBusPanel.prototype = {
          * and modifier trigger keys are copied to the value here. */
         let updatedTriggersShift = false;
         for (let i = 0; i < triggers.length; i++) {
-            /* meta_ui_parse_accelerator() is not available on GJS and
-             * Gtk.accelerator_parse is not recommended. */
-            let lindex = triggers[i].indexOf('<');
-            let rindex = triggers[i].indexOf('>');
-            if (lindex >= 0 && rindex > lindex + 1 &&
-                triggers[i].substring(lindex + 1, rindex).toLowerCase() != 'shift') {
+            let [keysym, modifiers] = this._accelerator_parse(triggers[i]);
+            let keybinding = new Keybinding(triggers[i], keysym, modifiers);
+            this._keybindings.push(keybinding);
+
+            if ((modifiers & IBus.ModifierType.SHIFT_MASK) == 0) {
                 let j = 0;
                 for (j = 0; j < triggersShift.length; j++) {
                     if (triggers[i] == triggersShift[j]) {
@@ -274,10 +359,10 @@ IBusPanel.prototype = {
         if (updatedTriggersShift) {
             this._config.set_value('general/hotkey', 'trigger_shift',
                                    GLib.Variant.new_strv(triggersShift));
-            global.display.add_keybinding(KEY_TRIGGER,
+            global.display.add_keybinding(KEY_TRIGGER_SHIFT,
                                           new Gio.Settings({ schema: SCHEMA_HOTKEY }),
                                           Meta.KeyBindingFlags.REVERSES,
-                                          Lang.bind(this, this._handleEngineSwitch),
+                                          Lang.bind(this, this._triggerKeyHandler),
                                           2,
                                           null);
         }
@@ -297,10 +382,20 @@ IBusPanel.prototype = {
         }
 
         if (locale.substring(0, 2) == 'ko') {
+            let ko_triggers = [
+                'Hangul',
+                'Alt'];
+
+            for (let i = 0; i < ko_triggers.length; i++) {
+                let [keysym, modifiers] = this._accelerator_parse(ko_triggers[i]);
+                let keybinding = new Keybinding(ko_triggers[i], keysym, modifiers);
+                this._keybindings.push(keybinding);
+            }
+
             global.display.add_keybinding(KEY_TRIGGER_KO,
                                           new Gio.Settings({ schema: SCHEMA_HOTKEY }),
                                           Meta.KeyBindingFlags.NONE,
-                                          Lang.bind(this, this._handleEngineSwitch),
+                                          Lang.bind(this, this._triggerKeyHandler),
                                           3,
                                           null);
         }
@@ -698,13 +793,56 @@ IBusPanel.prototype = {
         }
     },
 
-    _handleEngineSwitch: function(display, screen, window, binding, data) {
+    /**
+     * _globalKeyPressHandler:
+     *
+     * This is used for shell entry boxes likes shell search or run dialog.
+     */
+    _globalKeyPressHandler: function(actor, event) {
+        /* This filter is also called when Switcher dialog is running
+         * with gtk clients but this is needed for shell clients only.
+         * this._isSwitcherRunning is enabled when the dialog is running.
+         */
+        if (this._isSwitcherRunning) {
+            return;
+        }
+        if (event.type() != Clutter.EventType.KEY_PRESS) {
+            return;
+        }
+
+        let symbol = event.get_key_symbol();
+        let ignoredModifiers = global.display.get_ignored_modifier_mask();
+        let modifierState = event.get_state()
+            & IBus.ModifierType.MODIFIER_MASK
+            & ~ignoredModifiers;
+
+        for (let i = 0; i < this._keybindings.length; i++) {
+            if (this._keybindings[i].keysym == symbol &&
+                this._keybindings[i].modifiers == modifierState) {
+                // this._handleEngineSwitch() does not work.
+                // It seems keypress cannot be grabbed.
+                this._switchEngine(1, true);
+                break;
+            }
+        }
+    },
+
+    /**
+     * _globalKeyPressHandler:
+     *
+     * This is used for non-shell clients likes gtk clients.
+     */
+    _triggerKeyHandler: function(display, screen, window, binding, data) {
         let name = binding.get_name();
         if (name.substring(0, 7) != 'trigger') {
             global.log('Wrong name is binded ' + name);
             return;
         }
         let modifiers = binding.get_modifiers();
+        this._handleEngineSwitch(modifiers, binding.get_mask());
+    },
+
+    _handleEngineSwitch: function(modifiers, mask) {
         let backwards = modifiers & Meta.VirtualModifier.SHIFT_MASK;
         let switcher = new Switcher.Switcher(this);
         /* FIXME: Need to get the keysym.
@@ -715,6 +853,7 @@ IBusPanel.prototype = {
 
         switcher.connect('engine-activated',
                          Lang.bind (this, function (object, name) {
+            this._isSwitcherRunning = false;
             if (this._engines == null) {
                 global.log('Engine list is null.');
                 return;
@@ -726,8 +865,10 @@ IBusPanel.prototype = {
                 }
             }}));
 
-        if (!switcher.show(this._engines, backwards, binding.get_mask())) {
+        this._isSwitcherRunning = true;
+        if (!switcher.show(this._engines, backwards, mask)) {
             switcher.destroy();
+            this._isSwitcherRunning = false;
         }
     },
 
