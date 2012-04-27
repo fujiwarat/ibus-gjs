@@ -44,21 +44,11 @@ ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
 	    cp $< $@; \
 	fi;
 
-ui/status/ibus/ibusPanel.js: ui/status/ibus/ibusPanel.js.in
-	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
-	    sed -e "s|Config.HAVE_IBUS_XKB|$(HAVE_IBUS_XKB)|g" \
-	    $< > $@; \
-	else \
-	    cp $< $@; \
-	fi;
-
 EXTRA_DIST = \
 	misc/config.js.in		\
-	ui/status/ibus/ibusPanel.js.in	\
 	ui/status/ibus/xkbLayout.js.in	\
 	$(NULL)
 
 CLEANFILES = \
-	ui/status/ibus/ibusPanel.js		\
 	ui/status/ibus/xkbLayout.js	\
 	$(NULL)
