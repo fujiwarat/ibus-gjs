@@ -21,6 +21,7 @@
 const Clutter = imports.gi.Clutter;
 const Gio  = imports.gi.Gio;
 const Pango = imports.gi.Pango;
+const IBus = imports.gi.IBus;
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 const Meta = imports.gi.Meta;
@@ -65,8 +66,9 @@ function primaryModifier(mask) {
 const Switcher = new Lang.Class({
     Name: 'Switcher',
 
-    _init : function(panel) {
+    _init : function(panel, keybindings) {
         this.panel = panel;
+        this._keybindings = keybindings;
         this.actor = new Shell.GenericContainer({ name: 'switcher',
                                                   reactive: true,
                                                   visible: false });
@@ -170,16 +172,21 @@ const Switcher = new Lang.Class({
         this._haveModal = true;
         this._modifierMask = primaryModifier(mask);
 
-        this.actor.connect('key-press-event', Lang.bind(this, this._keyPressEvent));
-        this.actor.connect('key-release-event', Lang.bind(this, this._keyReleaseEvent));
+        this.actor.connect('key-press-event',
+                           Lang.bind(this, this._keyPressEventHandler));
+        this.actor.connect('key-release-event',
+                           Lang.bind(this, this._keyReleaseEventHandler));
 
-        this.actor.connect('button-press-event', Lang.bind(this, this._clickedOutside));
+        this.actor.connect('button-press-event',
+                           Lang.bind(this, this._clickedOutside));
         this.actor.connect('scroll-event', Lang.bind(this, this._onScroll));
 
         this._appSwitcher = new EngineSwitcher(engines, this);
         this.actor.add_child(this._appSwitcher.actor);
-        this._appSwitcher.connect('item-activated', Lang.bind(this, this._appActivated));
-        this._appSwitcher.connect('item-entered', Lang.bind(this, this._appEntered));
+        this._appSwitcher.connect('item-activated',
+                                  Lang.bind(this, this._appActivated));
+        this._appSwitcher.connect('item-entered',
+                                  Lang.bind(this, this._appEntered));
 
         this._appIcons = this._appSwitcher.icons;
 
@@ -217,35 +224,58 @@ const Switcher = new Lang.Class({
     _nextApp : function() {
         return mod(this._currentApp + 1, this._appIcons.length);
     },
+
     _previousApp : function() {
         return mod(this._currentApp - 1, this._appIcons.length);
     },
 
-    _keyPressEvent : function(actor, event) {
+    keyPressEvent : function(event) {
         let keysym = event.get_key_symbol();
-        let event_state = event.get_state();
-        let backwards = event_state & Clutter.ModifierType.SHIFT_MASK;
-        let action = global.display.get_keybinding_action(event.get_key_code(), event_state);
+        let ignoredModifiers = global.display.get_ignored_modifier_mask();
+        let eventState = event.get_state()
+            & IBus.ModifierType.MODIFIER_MASK
+            & ~ignoredModifiers;
+        let backwards = eventState & IBus.ModifierType.SHIFT_MASK;
+        eventState &= ~IBus.ModifierType.SHIFT_MASK;
+        let isTrigger = false;
 
         this._disableHover();
 
-        if (keysym == Clutter.Escape) {
-            this.destroy();
-        } else {
-            this._select(backwards ? this._previousApp() : this._nextApp());
+        for (let i = 0; i < this._keybindings.length; i++) {
+            if (this._keybindings[i].keysym == keysym &&
+                this._keybindings[i].modifiers == eventState) {
+                isTrigger = true;
+                break;
+            }
         }
 
-        return true;
+        if (isTrigger) {
+            this._select(backwards ? this._previousApp() : this._nextApp());
+            return true;
+        }
+
+        // Cancel the switcher if another key is pressed with pressing Ctrl.
+        this.destroy();
+        return false;
     },
 
-    _keyReleaseEvent : function(actor, event) {
+    keyReleaseEvent : function(event) {
         let [x, y, mods] = global.get_pointer();
         let state = mods & this._modifierMask;
 
-        if (state == 0)
+        if (state == 0) {
             this._finish();
+            return true;
+        }
+        return false;
+    },
 
-        return true;
+    _keyPressEventHandler : function(actor, event) {
+        return this.keyPressEvent(event);
+    },
+
+    _keyReleaseEventHandler : function(actor, event) {
+        return this.keyReleaseEvent(event);
     },
 
     _onScroll : function(actor, event) {

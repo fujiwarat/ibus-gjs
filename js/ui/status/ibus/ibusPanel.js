@@ -77,7 +77,7 @@ IBusPanel.prototype = {
         this._fallbackLockID = -1;
         this._changedXkbOption = false;
         this._keybindings = [];
-        this._isSwitcherRunning = false;
+        this._switcher = null;
 
         if (!this._initBus(bus)) {
             return;
@@ -799,36 +799,65 @@ IBusPanel.prototype = {
      * This is used for shell entry boxes likes shell search or run dialog.
      */
     _globalKeyPressHandler: function(actor, event) {
-        /* This filter is also called when Switcher dialog is running
-         * with gtk clients but this is needed for shell clients only.
-         * this._isSwitcherRunning is enabled when the dialog is running.
-         */
-        if (this._isSwitcherRunning) {
-            return;
-        }
-        if (event.type() != Clutter.EventType.KEY_PRESS) {
-            return;
+        if (event.type() != Clutter.EventType.KEY_PRESS &&
+            event.type() != Clutter.EventType.KEY_RELEASE) {
+            return false;
         }
 
-        let symbol = event.get_key_symbol();
+        let keysym = event.get_key_symbol();
         let ignoredModifiers = global.display.get_ignored_modifier_mask();
         let modifierState = event.get_state()
             & IBus.ModifierType.MODIFIER_MASK
             & ~ignoredModifiers;
+        let backwards = modifierState & IBus.ModifierType.SHIFT_MASK;
+        modifierState &= ~IBus.ModifierType.SHIFT_MASK;
+        let isTrigger = false;
+
+        if (modifierState &
+            (IBus.ModifierType.HANDLED_MASK | IBus.ModifierType.FORWARD_MASK)) {
+            return false;
+        }
+
+        // If Switcher dialog is running.
+        if (this._switcher != null) {
+            /* This filter is also called when Switcher dialog is running
+             * with gtk clients but this is needed for shell clients only.
+             */
+            if (!Main.overview.visible) {
+                return false;
+            }
+
+            if (event.type() == Clutter.EventType.KEY_PRESS) {
+                isTrigger = this._switcher.keyPressEvent(event);
+                if (!isTrigger) {
+                    // Do not handle KEY_RELEASE event.
+                    this._switcher = null;
+                }
+                return isTrigger;
+            }
+            else if (event.type() == Clutter.EventType.KEY_RELEASE) {
+                return this._switcher.keyReleaseEvent(event);
+            }
+        }
+
+        if (event.type() != Clutter.EventType.KEY_PRESS) {
+            return false;
+        }
 
         for (let i = 0; i < this._keybindings.length; i++) {
-            if (this._keybindings[i].keysym == symbol &&
+            if (this._keybindings[i].keysym == keysym &&
                 this._keybindings[i].modifiers == modifierState) {
-                // this._handleEngineSwitch() does not work.
-                // It seems keypress cannot be grabbed.
-                this._switchEngine(1, true);
+                this._handleEngineSwitch(modifierState | backwards,
+                                         modifierState | backwards);
+                isTrigger = true;
                 break;
             }
         }
+        return isTrigger;
     },
 
     /**
-     * _globalKeyPressHandler:
+     * _triggerKeyHandler:
      *
      * This is used for non-shell clients likes gtk clients.
      */
@@ -844,7 +873,8 @@ IBusPanel.prototype = {
 
     _handleEngineSwitch: function(modifiers, mask) {
         let backwards = modifiers & Meta.VirtualModifier.SHIFT_MASK;
-        let switcher = new Switcher.Switcher(this);
+        let switcher = new Switcher.Switcher(this, this._keybindings);
+        this._switcher = switcher;
         /* FIXME: Need to get the keysym.
          * MetaKeyHandlerFunc does not provide keysym but we have
          * the same keycode with different keysyms switching XKB layouts.
@@ -853,7 +883,7 @@ IBusPanel.prototype = {
 
         switcher.connect('engine-activated',
                          Lang.bind (this, function (object, name) {
-            this._isSwitcherRunning = false;
+            this._switcher = null;
             if (this._engines == null) {
                 global.log('Engine list is null.');
                 return;
@@ -865,10 +895,9 @@ IBusPanel.prototype = {
                 }
             }}));
 
-        this._isSwitcherRunning = true;
         if (!switcher.show(this._engines, backwards, mask)) {
             switcher.destroy();
-            this._isSwitcherRunning = false;
+            this._switcher = null;
         }
     },
 
