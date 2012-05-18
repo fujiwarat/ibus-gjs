@@ -341,7 +341,8 @@ IBusPanel.prototype = {
             let keybinding = new Keybinding(triggers[i], keysym, modifiers);
             this._keybindings.push(keybinding);
 
-            if ((modifiers & IBus.ModifierType.SHIFT_MASK) == 0) {
+            if (modifiers != 0 &&
+                (modifiers & IBus.ModifierType.SHIFT_MASK) == 0) {
                 let j = 0;
                 for (j = 0; j < triggersShift.length; j++) {
                     if (triggers[i] == triggersShift[j]) {
@@ -844,6 +845,16 @@ IBusPanel.prototype = {
             return false;
         }
 
+        /* FIXME: this._triggerKeyHandler returns the key events
+         * even if the keycode is matched but the keysym is not matched.
+         * E.g. grave on us keyboard and Zenkaku_Hankaku on jp keyboard
+         * are same keycodes but different keysyms.
+         * Do we need to check keycodes instead of keysyms here?
+         * Probably I think if users register Zenkaku_Hankaku as trigger,
+         * they do not like to treat grave as trigger.
+         * So maybe I wish to fix this._triggerKeyHandler instead of
+         * this._globalKeyPressHandler .
+         */
         for (let i = 0; i < this._keybindings.length; i++) {
             if (this._keybindings[i].keysym == keysym &&
                 this._keybindings[i].modifiers == modifierState) {
