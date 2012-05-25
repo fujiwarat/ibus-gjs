@@ -1,55 +1,82 @@
-%define ibus_version 1.3.99
+# sever system does not have GUI
+%ifarch ppc ppc64 s390 s390x
+%define with_gjs 0
+%else
+%define with_gjs 1
+%endif
+
+%define ibus_version 1.4.99
+%define ibus_xkb_version 1.4.99
+%define ibus_api_version 1.0
 
 Name:       ibus-gjs
 Version:    @PACKAGE_VERSION@
 Release:    1%{?dist}
-Summary:    GNOME-Shell GJS Plugin for IBus
+Summary:    IBus gnome-shell-extension
 License:    LGPLv2+
 Group:      System Environment/Libraries
 URL:        http://code.google.com/p/ibus/
 Source0:    http://ibus.googlecode.com/files/%{name}-%{version}.tar.gz
-# Patch0:     ibus-HEAD.patch
+# Patch0:     ibus-gjs-HEAD.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 
 BuildRequires:  gjs
 BuildRequires:  gnome-shell
-BuildRequires:  ibus-devel >= %{ibus_version}
+BuildRequires:  ibus-devel      >= %{ibus_version}
+BuildRequires:  ibus-xkb-devel  >= %{ibus_xkb_version}
+BuildRequires:  gettext-devel
+BuildRequires:  libtool
 BuildRequires:  intltool
 
 Requires:   gnome-shell
-Requires:   ibus        >= %{ibus_version}
-Requires:   ibus-libs   >= %{ibus_version}
+Requires:   ibus                >= %{ibus_version}
+Requires:   ibus-libs           >= %{ibus_version}
+Requires:   ibus-xkb            >= %{ibus_xkb_version}
+Requires:   ibus-xkb-libs       >= %{ibus_xkb_version}
 
 %description
 This is a transitional package which allows users to try out new IBus
 GUI for GNOME3 in development.  Note that this package will be marked
 as obsolete once the integration has completed in the GNOME3 upstream.
 
+
 %prep
+%if %with_gjs
 %setup -q
 # %patch0 -p1
+%endif
 
 %build
-%configure --disable-static
+%if %with_gjs
+# autoreconf -f -i
+%configure \
+  --with-gnome-shell-version="3.4" \
+  --with-gjs-version="1.32"
 
 # make -C po update-gmo
 make %{?_smp_mflags}
+%endif
 
 %install
+%if %with_gjs
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
 
 %find_lang %{name}
+%endif
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
+%if %with_gjs
 %files -f %{name}.lang
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README
 %{_datadir}/gnome-shell/js/ui/status/ibus
+%{_datadir}/gnome-shell/extensions/ibus-indicator@example.com
+%endif
 
 %changelog
 * @DATE_DISPLAY@ Takao Fujiwara <takao.fujiwara1@gmail.com> - @VERSION@-1
