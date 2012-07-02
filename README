@@ -15,6 +15,28 @@ directories since we'd try to integrate this module into upstream gnome-shell.
  - extension files are installed in
    /usr/share/gnome-shell/extensions/ibus-indicator@example.com
 
+To work with gnome-shell 3.4 or later, the latest ibus 1.4.99 and
+ibus-xkb is required.
+
+You need to enable gobject-introspection in the latest ibus and
+disable engine and UI so that ibus-xkb's ones are used instead.
+If you use dconf, the following patch is required for ibus:
+https://github.com/ibus/ibus/commit/4bee2863e8d2e51b185b6d149e6259848d8c0cb6
+
+ibus would be built with the following configure options:
+
+# cd ibus-1.4.99.20120529
+# ./configure --prefix=/usr \
+              --disable-engine --disable-ui --prefix=/usr \
+              --enable-dconf --disable-gconf \
+              --enable-introspection
+
+ibus-xkb would be built with the following configure options:
+
+# cd ibus-xkb-1.4.99.20120531
+# ./configure --prefix=/usr --enable-dconf --disable-gconf
+
+
 Need to enable the ibus extension by manual after you install ibus-gjs:
 
 Run gnome-tweak-tool on gnome-shell and enable the extension of
