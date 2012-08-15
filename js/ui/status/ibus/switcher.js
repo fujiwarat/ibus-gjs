@@ -155,7 +155,7 @@ const Switcher = new Lang.Class({
         }
     },
 
-    show : function(engines, backward, mask) {
+    show : function(engines, mask) {
 
         if (engines.length <= 1) {
             return false;
@@ -235,13 +235,12 @@ const Switcher = new Lang.Class({
         let eventState = event.get_state()
             & IBus.ModifierType.MODIFIER_MASK
             & ~ignoredModifiers;
-        let backwards = eventState & IBus.ModifierType.SHIFT_MASK;
-        eventState &= ~IBus.ModifierType.SHIFT_MASK;
         let isTrigger = false;
 
         this._disableHover();
 
-        for (let i = 0; i < this._keybindings.length; i++) {
+        let i = 0;
+        for (; i < this._keybindings.length; i++) {
             if (this._keybindings[i].keysym == keysym &&
                 this._keybindings[i].modifiers == eventState) {
                 isTrigger = true;
@@ -250,7 +249,8 @@ const Switcher = new Lang.Class({
         }
 
         if (isTrigger) {
-            this._select(backwards ? this._previousApp() : this._nextApp());
+            this._select(this._keybindings[i].reverse ?
+                         this._previousApp() : this._nextApp());
             return true;
         }
 

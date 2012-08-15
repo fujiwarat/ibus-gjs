@@ -44,20 +44,21 @@ const ICON_ENGINE = 'ibus-engine';
 const SCHEMA_HOTKEY = 'org.freedesktop.ibus.xkb.hotkey';
 const SECTION_HOTKEY = 'general/hotkey';
 const KEY_TRIGGER = 'trigger-accel';
-const KEY_TRIGGER_SHIFT = 'trigger-shift';
+const KEY_TRIGGER_BACKWARD = 'trigger-accel-backward';
 const KEY_TRIGGER_KO = 'trigger-ko';
 const LAYOUTS_MAX_LENGTH = 4;
 const ACCELERATOR_SWITCH_IME_FOREWARD = '<Control>space';
 
-function Keybinding(accelerator, keysym, modifiers) {
-    this._init(accelerator, keysym, modifiers);
+function Keybinding(accelerator, keysym, modifiers, reverse) {
+    this._init(accelerator, keysym, modifiers, reverse);
 }
 
 Keybinding.prototype = {
-    _init: function(accelerator, keysym, modifiers) {
+    _init: function(accelerator, keysym, modifiers, reverse) {
         this.accelerator = accelerator;
         this.keysym = keysym;
         this.modifiers = modifiers;
+        this.reverse = reverse;
     }
 };
 
@@ -79,6 +80,7 @@ IBusPanel.prototype = {
         this._changedXkbOption = false;
         this._keybindings = [];
         this._switcher = null;
+        this._enable_trigger_ko = false;
 
         if (!this._initBus(bus)) {
             return;
@@ -162,6 +164,12 @@ IBusPanel.prototype = {
                                       Meta.KeyBindingFlags.NONE,
                                       Lang.bind(this, this._triggerKeyHandler),
                                       1,
+                                      null);
+        global.display.add_keybinding(KEY_TRIGGER_BACKWARD,
+                                      new Gio.Settings({ schema: SCHEMA_HOTKEY }),
+                                      Meta.KeyBindingFlags.NONE,
+                                      Lang.bind(this, this._triggerKeyHandler),
+                                      2,
                                       null);
         this._initTriggerKeys();
         return true;
@@ -298,10 +306,12 @@ IBusPanel.prototype = {
                 modifiers |= IBus.ModifierType.META_MASK;
             }
             else if (name == 'hyper') {
-                modifiers |= IBus.ModifierType.HYPER_MASK;
+                // meta_display_devirtualize_modifiers is not available
+                modifiers |= IBus.ModifierType.MOD4_MASK;
             }
             else if (name == 'super') {
-                modifiers |= IBus.ModifierType.SUPER_MASK;
+                // meta_display_devirtualize_modifiers is not available
+                modifiers |= IBus.ModifierType.MOD4_MASK;
             }
             accel = accel.substring(rindex + 1, accel.length);
 
@@ -328,45 +338,27 @@ IBusPanel.prototype = {
         let varTrigger = this._config.get_value('general/hotkey',
                                                 'trigger_accel');
         let triggers = varTrigger ? varTrigger.dup_strv() : [];
-        let triggersShift = [];
 
-        /* FIXME: ibus supports multiple trigger keys in 'trigger_accel'
-         * to switch ibus engines and some trigger keys have modifiers
-         * and other do not.
-         * Currently meta_display_add_keybinding() assigns the
-         * shift reverse by key. I created a new key 'trigger_shift'
-         * and modifier trigger keys are copied to the value here. */
-        let updatedTriggersShift = false;
         for (let i = 0; i < triggers.length; i++) {
             let [keysym, modifiers] = this._accelerator_parse(triggers[i]);
-            let keybinding = new Keybinding(triggers[i], keysym, modifiers);
+            let keybinding = new Keybinding(triggers[i],
+                                            keysym,
+                                            modifiers,
+                                            false);
             this._keybindings.push(keybinding);
-
-            if (modifiers != 0 &&
-                (modifiers & IBus.ModifierType.SHIFT_MASK) == 0) {
-                let j = 0;
-                for (j = 0; j < triggersShift.length; j++) {
-                    if (triggers[i] == triggersShift[j]) {
-                        break;
-                    }
-                }
-
-                if (j >= triggersShift.length) {
-                    triggersShift.push(triggers[i]);
-                    updatedTriggersShift = true;
-                }
-            }
         }
 
-        if (updatedTriggersShift) {
-            this._config.set_value('general/hotkey', 'trigger_shift',
-                                   GLib.Variant.new_strv(triggersShift));
-            global.display.add_keybinding(KEY_TRIGGER_SHIFT,
-                                          new Gio.Settings({ schema: SCHEMA_HOTKEY }),
-                                          Meta.KeyBindingFlags.REVERSES,
-                                          Lang.bind(this, this._triggerKeyHandler),
-                                          2,
-                                          null);
+        let varTriggerBack = this._config.get_value('general/hotkey',
+                                                    'trigger_accel_backward');
+        let triggersBack = varTriggerBack ? varTriggerBack.dup_strv() : [];
+
+        for (let i = 0; i < triggersBack.length; i++) {
+            let [keysym, modifiers] = this._accelerator_parse(triggersBack[i]);
+            let keybinding = new Keybinding(triggers[i],
+                                            keysym,
+                                            modifiers,
+                                            true);
+            this._keybindings.push(keybinding);
         }
 
         if (!(triggers.length == 1 &&
@@ -390,10 +382,14 @@ IBusPanel.prototype = {
 
             for (let i = 0; i < ko_triggers.length; i++) {
                 let [keysym, modifiers] = this._accelerator_parse(ko_triggers[i]);
-                let keybinding = new Keybinding(ko_triggers[i], keysym, modifiers);
+                let keybinding = new Keybinding(ko_triggers[i],
+                                                keysym,
+                                                modifiers,
+                                                false);
                 this._keybindings.push(keybinding);
             }
 
+            this._enable_trigger_ko = true;
             global.display.add_keybinding(KEY_TRIGGER_KO,
                                           new Gio.Settings({ schema: SCHEMA_HOTKEY }),
                                           Meta.KeyBindingFlags.NONE,
@@ -885,7 +881,6 @@ IBusPanel.prototype = {
     },
 
     _handleEngineSwitch: function(modifiers, mask) {
-        let backwards = modifiers & Meta.VirtualModifier.SHIFT_MASK;
         let switcher = new Switcher.Switcher(this, this._keybindings);
         this._switcher = switcher;
         /* FIXME: Need to get the keysym.
@@ -908,7 +903,7 @@ IBusPanel.prototype = {
                 }
             }}));
 
-        if (!switcher.show(this._engines, backwards, mask)) {
+        if (!switcher.show(this._engines, mask)) {
             switcher.destroy();
             this._switcher = null;
         }
@@ -923,6 +918,34 @@ IBusPanel.prototype = {
 
         if (section == 'general' && name == 'preload_engines') {
             this._updateEngines(variant, null);
+            return;
+        }
+
+        if (section == 'general/hotkey' &&
+            name.length >= 13 && name.substring(0, 13) == 'trigger_accel') {
+            global.display.remove_keybinding(KEY_TRIGGER);
+            global.display.remove_keybinding(KEY_TRIGGER_BACKWARD);
+
+            if (this._enable_trigger_ko) {
+                global.display.remove_keybinding(KEY_TRIGGER_KO);
+                this._enable_trigger_ko = false;
+            }
+
+            this._keybindings = [];
+
+            global.display.add_keybinding(KEY_TRIGGER,
+                                          new Gio.Settings({ schema: SCHEMA_HOTKEY }),
+                                          Meta.KeyBindingFlags.NONE,
+                                          Lang.bind(this, this._triggerKeyHandler),
+                                          1,
+                                          null);
+            global.display.add_keybinding(KEY_TRIGGER_BACKWARD,
+                                          new Gio.Settings({ schema: SCHEMA_HOTKEY }),
+                                          Meta.KeyBindingFlags.NONE,
+                                          Lang.bind(this, this._triggerKeyHandler),
+                                          2,
+                                          null);
+            this._initTriggerKeys();
             return;
         }
 
