@@ -6,7 +6,6 @@
 %endif
 
 %define ibus_version 1.4.99
-%define ibus_xkb_version 1.4.99
 %define ibus_api_version 1.0
 
 Name:       ibus-gjs
@@ -25,7 +24,6 @@ BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildRequires:  gjs
 BuildRequires:  gnome-shell
 BuildRequires:  ibus-devel      >= %{ibus_version}
-BuildRequires:  ibus-xkb-devel  >= %{ibus_xkb_version}
 BuildRequires:  gettext-devel
 BuildRequires:  libtool
 BuildRequires:  intltool
@@ -33,8 +31,6 @@ BuildRequires:  intltool
 Requires:   gnome-shell
 Requires:   ibus                >= %{ibus_version}
 Requires:   ibus-libs           >= %{ibus_version}
-Requires:   ibus-xkb            >= %{ibus_xkb_version}
-Requires:   ibus-xkb-libs       >= %{ibus_xkb_version}
 
 %description
 This is a transitional package which allows users to try out new IBus
