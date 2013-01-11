@@ -23,7 +23,6 @@ const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Gkbd = imports.gi.Gkbd;
 const IBus = imports.gi.IBus;
-const IBusXKB = imports.gi.IBusXKB;
 const Shell = imports.gi.Shell;
 const St = imports.gi.St;
 const Meta = imports.gi.Meta;
@@ -41,7 +40,7 @@ const Switcher = imports.ui.status.ibus.switcher;
 const Common = imports.ui.status.ibus.common;
 
 const ICON_ENGINE = 'ibus-engine';
-const SCHEMA_HOTKEY = 'org.freedesktop.ibus.xkb.hotkey';
+const SCHEMA_HOTKEY = 'org.freedesktop.ibus.general.hotkey';
 const SECTION_HOTKEY = 'general/hotkey';
 const KEY_TRIGGER = 'triggers';
 const KEY_TRIGGER_NO_MODIFIERS = 'triggers-no-modifiers';
@@ -235,7 +234,7 @@ IBusPanel.prototype = {
         // because config_value_changed_cb() calls updateIMEngines().
         if (this._config != null && !preloadEnginesInited) {
             let variant = GLib.Variant.new_int32(
-                    IBusXKB.PreloadEngineMode.LANG_RELATIVE);
+                    IBus.PreloadEngineMode.LANG_RELATIVE);
             this._config.set_value('general',
                                    'preload_engine_mode',
                                    variant);
@@ -461,10 +460,9 @@ IBusPanel.prototype = {
         let var_preload_engine_mode =
             this._config.get_value('general', 'preload_engine_mode');
         let preload_engine_mode = (var_preload_engine_mode != null) ?
-            var_preload_engine_mode.get_int32() :
-            IBusXKB.PreloadEngineMode.USER;
+            var_preload_engine_mode.get_int32() : IBus.PreloadEngineMode.USER;
 
-        if (preload_engine_mode == IBusXKB.PreloadEngineMode.USER) {
+        if (preload_engine_mode == IBus.PreloadEngineMode.USER) {
             return;
         }
 
@@ -481,7 +479,7 @@ IBusPanel.prototype = {
         this._layouts = varLayout.split(',');
         this._variants = varVariant.split(',');
 
-        let registry = new IBusXKB.ConfigRegistry();
+        let registry = new IBus.XKBConfigRegistry();
         let varXkbEngineNames = [];
         let descriptions = this._gkbdlayout.get_short_group_names();
         let engines = [];
