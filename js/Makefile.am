@@ -36,13 +36,7 @@ nobase_dist_js_DATA = 	\
 	$(NULL)
 
 ui/status/ibus/xkbLayout.js: ui/status/ibus/xkbLayout.js.in
-	@if test x"$(ENABLE_STANDALONE)" = xyes; then \
-	    sed -e "s|Config.IBUS_XKB|'$(IBUS_XKB)'|g" \
-	        -e "s|Config.HAVE_IBUS_XKB|$(HAVE_IBUS_XKB)|g" \
-	    $< > $@; \
-	else \
-	    cp $< $@; \
-	fi;
+	@cp $< $@
 
 EXTRA_DIST = \
 	misc/config.js.in		\

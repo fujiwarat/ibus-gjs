@@ -38,21 +38,10 @@ function XKBLayout(config, command) {
 XKBLayout.prototype = {
     _init: function(config) {
         this._config = config;
-        this._xkbCommand = Config.IBUS_XKB;
-        this._haveIBusXkb = Config.HAVE_IBUS_XKB;
+        this._xkbCommand = 'setxkbmap';
         this._useXmodmap = true;
         this._xkbPid = -1;
         this._xmodmapPid = -1;
-
-        if (this._haveIBusXkb == false) {
-            this._xkbCommand = 'setxkbmap';
-            this._useXmodmap = false;
-        }
-        if (this._xkbCommand == null) {
-            this._xkbCommand = 'setxkbmap';
-            this._haveIBusXkb = false;
-            this._useXmodmap = false;
-        }
 
         this._defaultLayout = "";
         this._defaultVariant = "";
@@ -111,18 +100,22 @@ XKBLayout.prototype = {
     },
 
     _getOutputFromCmdline: function(arg, str) {
-        let retval = null;
-        let basename = GLib.path_get_basename(this._xkbCommand);
-        let argv = [this._xkbCommand, basename, arg];
+        let retval = '';
+        let argv = [this._xkbCommand, arg];
         let [result, output, std_err, status] = this._spawnWithPipes(argv);
         if (!result) {
-            return null;
+            return '';
         }
         let lines = ('' + output).split('\n');
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i];
             if (line.substring(0, str.length) == str) {
                 retval = line.substring(str.length);
+                if (retval == null) {
+                    retval = '';
+                } else {
+                    retval = retval.trim();
+                }
                 break;
             }
         }
@@ -346,44 +339,32 @@ XKBLayout.prototype = {
     },
 
     getLayout: function() {
-        if (this._haveIBusXkb) {
-            return this._getOutputFromCmdline('--get', 'layout: ');
-        } else {
-            return this._getOutputFromCmdline('-query', 'layout: ');
-        }
+        return this._getOutputFromCmdline('-query', 'layout: ');
     },
 
     getVariant: function() {
-        if (this._haveIBusXkb) {
-            return this._getOutputFromCmdline('--get', 'variant: ');
-        } else {
-            return this._getOutputFromCmdline('-query', 'variant: ');
-        }
+        return this._getOutputFromCmdline('-query', 'variant: ');
     },
 
     getOption: function() {
-        if (this._haveIBusXkb) {
-            return this._getOutputFromCmdline('--get', 'option: ');
-        } else {
-            return this._getOutputFromCmdline('-query', 'options: ');
-        }
+        return this._getOutputFromCmdline('-query', 'options: ');
     },
 
-    setLayout: function(layout) {
-        let variant = 'default';
-        let option = 'default';
+    setLayout: function(engine) {
+        let layout = engine.get_layout();
+        let variant = engine.get_layout_variant();
+        let option = engine.get_layout_option();
         let xkbGroupId = 0;
         let changedOption = false;
 
         if (this._xkbPid != -1) {
             return [-1, false];
         }
-        if (layout == undefined || layout == 'default') {
+        if (layout == 'default' &&
+            (variant == 'default' || variant == '') &&
+            (option == 'default' || option == '')) {
             return [-1, false];
         }
-
-        [layout, variant] = this._getVariantFromLayout(layout);
-        [layout, option] = this._getOptionFromLayout(layout);
 
         let needUsLayout = false;
         for (let i = 0; i < this._xkbLatinLayouts.length; i ++) {
@@ -468,25 +449,17 @@ XKBLayout.prototype = {
 
         let args = [];
         args.push(this._xkbCommand);
-        if (this._haveIBusXkb) {
-            args.push('--layout');
-            args.push(layout);
-            if (variant != null) {
-                args.push('--variant');
-                args.push(variant);
-            }
-            if (option != null) {
-                args.push('--option');
-                args.push(option);
-            }
-        } else {
-            args.push(layout);
-            if (variant != null) {
-                args.push(variant);
-            }
-            if (option != null) {
-                args.push(option);
-            }
+        args.push('-layout');
+        args.push(layout);
+        if (variant != null) {
+            args.push('-variant');
+            args.push(variant);
+        }
+        if (option != null) {
+            /* TODO: Need to get the session XKB options */
+            args.push('-option');
+            args.push('-option');
+            args.push(option);
         }
 
         this._spawnAsyncXkb(args);

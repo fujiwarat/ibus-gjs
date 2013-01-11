@@ -43,9 +43,8 @@ const Common = imports.ui.status.ibus.common;
 const ICON_ENGINE = 'ibus-engine';
 const SCHEMA_HOTKEY = 'org.freedesktop.ibus.xkb.hotkey';
 const SECTION_HOTKEY = 'general/hotkey';
-const KEY_TRIGGER = 'trigger-accel';
-const KEY_TRIGGER_BACKWARD = 'trigger-accel-backward';
-const KEY_TRIGGER_KO = 'trigger-ko';
+const KEY_TRIGGER = 'triggers';
+const KEY_TRIGGER_NO_MODIFIERS = 'triggers-no-modifiers';
 const LAYOUTS_MAX_LENGTH = 4;
 const ACCELERATOR_SWITCH_IME_FOREWARD = '<Control>space';
 
@@ -80,7 +79,6 @@ IBusPanel.prototype = {
         this._changedXkbOption = false;
         this._keybindings = [];
         this._switcher = null;
-        this._enable_trigger_ko = false;
 
         if (!this._initBus(bus)) {
             return;
@@ -161,15 +159,9 @@ IBusPanel.prototype = {
 
         global.display.add_keybinding(KEY_TRIGGER,
                                       new Gio.Settings({ schema: SCHEMA_HOTKEY }),
-                                      Meta.KeyBindingFlags.NONE,
+                                      Meta.KeyBindingFlags.REVERSES,
                                       Lang.bind(this, this._triggerKeyHandler),
                                       1,
-                                      null);
-        global.display.add_keybinding(KEY_TRIGGER_BACKWARD,
-                                      new Gio.Settings({ schema: SCHEMA_HOTKEY }),
-                                      Meta.KeyBindingFlags.NONE,
-                                      Lang.bind(this, this._triggerKeyHandler),
-                                      2,
                                       null);
         this._initTriggerKeys();
         return true;
@@ -335,9 +327,12 @@ IBusPanel.prototype = {
             return;
         }
 
+        let reverseModifiers = IBus.ModifierType.SHIFT_MASK;
         let varTrigger = this._config.get_value('general/hotkey',
-                                                'trigger_accel');
-        let triggers = varTrigger ? varTrigger.dup_strv() : [];
+                                                'triggers');
+        let triggers = varTrigger ? varTrigger.dup_strv() :
+            [ACCELERATOR_SWITCH_IME_FOREWARD];
+        let trigggersNoModifiers = [];
 
         for (let i = 0; i < triggers.length; i++) {
             let [keysym, modifiers] = this._accelerator_parse(triggers[i]);
@@ -346,63 +341,32 @@ IBusPanel.prototype = {
                                             modifiers,
                                             false);
             this._keybindings.push(keybinding);
-        }
 
-        let varTriggerBack = this._config.get_value('general/hotkey',
-                                                    'trigger_accel_backward');
-        let triggersBack = varTriggerBack ? varTriggerBack.dup_strv() : [];
+            if (modifiers == 0 || modifiers == reverseModifiers) {
+                trigggersNoModifiers.push(triggers[i]);
+                continue;
+            }
 
-        for (let i = 0; i < triggersBack.length; i++) {
-            let [keysym, modifiers] = this._accelerator_parse(triggersBack[i]);
-            let keybinding = new Keybinding(triggers[i],
-                                            keysym,
-                                            modifiers,
-                                            true);
+            if ((modifiers & reverseModifiers) != 0) {
+                continue;
+            }
+
+            modifiers |= reverseModifiers;
+            keybinding = new Keybinding(triggers[i],
+                                        keysym,
+                                        modifiers,
+                                        true);
             this._keybindings.push(keybinding);
         }
 
-        if (!(triggers.length == 1 &&
-              triggers[0] == ACCELERATOR_SWITCH_IME_FOREWARD)) {
-            return;
-        }
-
-        /* Either $LANG or get_language_names are not correct.
-         * Currently there is no way to get LC_CTYPE.
-         */
-        let locale = GLib.getenv('LANG');
-        if (locale == null) {
-            let langs = GLib.get_language_names();
-            locale = (langs.length > 0) ? langs[0] : 'C';
-        }
-
-        if (locale.substring(0, 2) == 'ko') {
-            let ko_triggers = [
-                'Hangul',
-                'Alt'];
-
-            for (let i = 0; i < ko_triggers.length; i++) {
-                let [keysym, modifiers] = this._accelerator_parse(ko_triggers[i]);
-                let keybinding = new Keybinding(ko_triggers[i],
-                                                keysym,
-                                                modifiers,
-                                                false);
-                this._keybindings.push(keybinding);
-            }
-
-            this._enable_trigger_ko = true;
-            global.display.add_keybinding(KEY_TRIGGER_KO,
-                                          new Gio.Settings({ schema: SCHEMA_HOTKEY }),
-                                          Meta.KeyBindingFlags.NONE,
-                                          Lang.bind(this, this._triggerKeyHandler),
-                                          3,
-                                          null);
-        }
-
-        /* FIXME: if locale.substring(0, 2) == 'ja', I'd like to use 
-         * Zenkaku_Hankaku but Zenkaku_Hankaku and grave have the 
-         * same keycode. So grave cannot be typed on US keyboard
-         * if Zenkaku_Hankaku is enabled.
-         */
+        this._config.set_value('general/hotkey', 'triggers-no-modifiers',
+                               GLib.Variant.new_strv(trigggersNoModifiers));
+        global.display.add_keybinding(KEY_TRIGGER_NO_MODIFIERS,
+                                      new Gio.Settings({ schema: SCHEMA_HOTKEY }),
+                                      Meta.KeyBindingFlags.NONE,
+                                      Lang.bind(this, this._triggerKeyHandler),
+                                      2,
+                                      null);
     },
 
     _initGkbd: function() {
@@ -729,7 +693,7 @@ IBusPanel.prototype = {
         this._setIMIcon(engine.icon, this.getIconTextFromEngine(engine));
 
         // set xkb layout
-        this._setLayout(engine.get_layout());
+        this._setLayout(engine);
 
         if (this._config != null) {
             let names = [];
@@ -741,8 +705,10 @@ IBusPanel.prototype = {
         }
     },
 
-    _setLayout: function(layout) {
-        if (layout == 'default' || layout == null) {
+    _setLayout: function(engine) {
+        let layout = engine.get_layout();
+
+        if (layout == '' || layout == null) {
             return;
         }
 
@@ -751,20 +717,27 @@ IBusPanel.prototype = {
             this._initTriggerKeys();
         }
 
-        if (this._setGkbdLayout(layout)) {
+        if (this._setGkbdLayout(engine)) {
             return;
         }
 
-        this._setXkbGroupLayout(layout);
+        this._setXkbGroupLayout(engine);
         return;
     },
 
-    _setGkbdLayout: function(layout) {
+    _setGkbdLayout: function(engine) {
+        let layout = engine.get_layout();
+        let variant = engine.get_layout_variant();
+
         /* If a previous ibus engine changed XKB options, need to set the
          * default XKB option. */
         if (this._changedXkbOption) {
             this._changedXkbOption = false;
             return false;
+        }
+
+        if (variant != '' && variant != 'default') {
+            layout = layout + '(' + variant + ')';
         }
 
         let gkbdLen = this._gkbdlayout.get_group_names().length;
@@ -781,8 +754,8 @@ IBusPanel.prototype = {
         return false;
     },
 
-    _setXkbGroupLayout: function(layout) {
-        let retval = this._xkblayout.setLayout(layout);
+    _setXkbGroupLayout: function(engine) {
+        let retval = this._xkblayout.setLayout(engine);
         if (retval[0] >= 0) {
             /* If an XKB keymap is added into the XKB group, 
              * this._gkbdlayout.lock_group will be called after
@@ -921,29 +894,16 @@ IBusPanel.prototype = {
             return;
         }
 
-        if (section == 'general/hotkey' &&
-            name.length >= 13 && name.substring(0, 13) == 'trigger_accel') {
+        if (section == 'general/hotkey' && name == 'triggers') {
             global.display.remove_keybinding(KEY_TRIGGER);
-            global.display.remove_keybinding(KEY_TRIGGER_BACKWARD);
-
-            if (this._enable_trigger_ko) {
-                global.display.remove_keybinding(KEY_TRIGGER_KO);
-                this._enable_trigger_ko = false;
-            }
 
             this._keybindings = [];
 
             global.display.add_keybinding(KEY_TRIGGER,
                                           new Gio.Settings({ schema: SCHEMA_HOTKEY }),
-                                          Meta.KeyBindingFlags.NONE,
+                                          Meta.KeyBindingFlags.REVERSES,
                                           Lang.bind(this, this._triggerKeyHandler),
                                           1,
-                                          null);
-            global.display.add_keybinding(KEY_TRIGGER_BACKWARD,
-                                          new Gio.Settings({ schema: SCHEMA_HOTKEY }),
-                                          Meta.KeyBindingFlags.NONE,
-                                          Lang.bind(this, this._triggerKeyHandler),
-                                          2,
                                           null);
             this._initTriggerKeys();
             return;

@@ -93,39 +93,17 @@ if test "x$ac_cv_env_PKG_CONFIG_set" != "xset"; then
         AC_PATH_TOOL([PKG_CONFIG], [pkg-config])
 fi
 
-AC_MSG_CHECKING([for IBus parameters])
+# Check ibus
 IBUS_PC_NAME=ibus-1.0
 IBUS_XKB_PC_NAME=ibus-xkb
-IBUS_MIN_VERSION=1.4.99
-IBUS_XKB_MIN_VERSION=1.4.99
-if $PKG_CONFIG --exists $IBUS_PC_NAME ; then
-    PKG_CHECK_MODULES(IBUS, [
-        $IBUS_PC_NAME >= $IBUS_MIN_VERSION
-    ])
-    PKG_CHECK_MODULES(IBUS_XKB, [
-        $IBUS_XKB_PC_NAME >= $IBUS_XKB_MIN_VERSION
-    ])
-
-    HAVE_IBUS=1
-    HAVE_IBUS_XKB=`$PKG_CONFIG --variable have_ibus_xkb $IBUS_XKB_PC_NAME`
-    if test x"$HAVE_IBUS_XKB" != xtrue ; then
-        HAVE_IBUS_XKB=false
-    fi
-    IBUS_XKB=`$PKG_CONFIG --variable ibus_xkb $IBUS_XKB_PC_NAME`
-    AC_MSG_RESULT([yes
-                   HAVE_IBUS_XKB=$HAVE_IBUS_XKB
-                   IBUS_XKB=$IBUS_XKB])
-else
-    HAVE_IBUS=0
-    HAVE_IBUS_XKB=false
-    IBUS_XKB=
-    AC_MSG_RESULT([no
-                   HAVE_IBUS_XKB=$HAVE_IBUS_XKB
-                   IBUS_XKB=$IBUS_XKB])
-fi
-AC_SUBST(HAVE_IBUS)
-AC_SUBST(HAVE_IBUS_XKB)
-AC_SUBST(IBUS_XKB)
+IBUS_MIN_VERSION=1.5.0
+IBUS_XKB_MIN_VERSION=1.5.0
+PKG_CHECK_MODULES(IBUS, [
+    $IBUS_PC_NAME >= $IBUS_MIN_VERSION
+])
+PKG_CHECK_MODULES(IBUS_XKB, [
+    $IBUS_XKB_PC_NAME >= $IBUS_XKB_MIN_VERSION
+])
 
 # Check GNOME-Shell VERSION
 AC_ARG_WITH(gnome-shell-js-dir,
@@ -225,9 +203,6 @@ Build options:
   Version                   $VERSION
   Install prefix            $prefix
   Enable standalone         $ENABLE_STANDALONE
-  HAVE IBus                 $HAVE_IBUS
-  HAVE IBus XKB             $HAVE_IBUS_XKB
-  IBUS XKB                  $IBUS_XKB
   GNOME_SHELL_VERSION       $GNOME_SHELL_VERSION
   GJS_VERSION               $GJS_VERSION
 ])
